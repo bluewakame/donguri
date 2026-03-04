@@ -464,6 +464,13 @@ button:active { background-color: #5e7a52; }
   font-family: monospace;
 }
 
+.qr-countdown {
+  font-size: 13px;
+  color: #e67e22;
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+
 .qr-hint {
   font-size: 13px;
   color: #777;

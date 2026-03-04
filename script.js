@@ -564,13 +564,30 @@ function scanTick(video, canvas, ctx) {
 async function handleQrResult(text) {
   stopScanner();
 
-  // QRフォーマット: "donguri:店舗ID"
+  // QRフォーマット: "donguri:店舗ID:時間窓"
   if (!text.startsWith("donguri:")) {
     showQrMessage("❌ このQRは加盟店のものではありません");
     return;
   }
 
-  const shopId  = text.slice("donguri:".length);
+  const parts = text.split(":");
+  if (parts.length < 2) {
+    showQrMessage("❌ QRコードの形式が正しくありません");
+    return;
+  }
+
+  const shopId   = parts[1];
+  const qrWindow = parts.length >= 3 ? parseInt(parts[2]) : null;
+
+  // 時間窓の検証（±1窓 = 最大10分の余裕）
+  if (qrWindow !== null) {
+    const diff = Math.abs(currentQrWindow() - qrWindow);
+    if (diff > 1) {
+      showQrMessage("⏰ このQRコードは期限切れです。お店の画面を再度ご確認ください");
+      return;
+    }
+  }
+
   const today   = new Date().toISOString().slice(0, 10);
   const scanKey = "qr_scan_" + shopId;
 
@@ -740,31 +757,74 @@ function deleteShop(shopId) {
   renderShopList();
 }
 
+// QRコードの時間窓（5分 = 300秒）
+const QR_WINDOW_SEC = 300;
+
+function currentQrWindow() {
+  return Math.floor(Date.now() / (QR_WINDOW_SEC * 1000));
+}
+
+let qrCountdownTimer  = null;
+let qrRefreshShopId   = null;
+
 function showShopQR(shopId) {
   const shop = shops.find(s => s.id === shopId);
   if (!shop) return;
 
+  qrRefreshShopId = shopId;
   document.getElementById("qrShopName").textContent = shop.name;
-  document.getElementById("qrShopId").textContent   = `donguri:${shop.id}`;
+  document.getElementById("qrDisplayModal").style.display  = "block";
+  document.getElementById("qrDisplayOverlay").style.display = "block";
+
+  renderTimedQR(shop);
+  startQrCountdown(shop);
+}
+
+function renderTimedQR(shop) {
+  const win  = currentQrWindow();
+  const text = `donguri:${shop.id}:${win}`;
+
+  document.getElementById("qrShopId").textContent = text;
 
   const wrap = document.getElementById("qrCanvas");
   wrap.innerHTML = "";
   new QRCode(wrap, {
-    text:   `donguri:${shop.id}`,
+    text,
     width:  200,
     height: 200,
     colorDark:  "#2c3e50",
     colorLight: "#ffffff",
     correctLevel: QRCode.CorrectLevel.M
   });
+}
 
-  document.getElementById("qrDisplayModal").style.display  = "block";
-  document.getElementById("qrDisplayOverlay").style.display = "block";
+function startQrCountdown(shop) {
+  if (qrCountdownTimer) clearInterval(qrCountdownTimer);
+
+  const countEl = document.getElementById("qrCountdown");
+
+  function tick() {
+    const elapsed = Math.floor(Date.now() / 1000) % QR_WINDOW_SEC;
+    const remaining = QR_WINDOW_SEC - elapsed;
+    countEl.textContent = `🔄 ${remaining}秒後に更新`;
+
+    if (remaining <= 1) {
+      renderTimedQR(shop);
+    }
+  }
+
+  tick();
+  qrCountdownTimer = setInterval(tick, 1000);
 }
 
 function closeQrDisplay() {
   document.getElementById("qrDisplayModal").style.display  = "none";
   document.getElementById("qrDisplayOverlay").style.display = "none";
+  if (qrCountdownTimer) {
+    clearInterval(qrCountdownTimer);
+    qrCountdownTimer = null;
+  }
+  qrRefreshShopId = null;
 }
 
 // ===========================
