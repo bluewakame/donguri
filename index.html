@@ -128,7 +128,7 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
-        navigator.serviceWorker.register("/sw.js").then(function (reg) {
+        navigator.serviceWorker.register("/donguri/sw.js").then(function (reg) {
           console.log("Service Worker登録成功:", reg.scope);
         }).catch(function (err) {
           console.log("Service Worker登録失敗:", err);

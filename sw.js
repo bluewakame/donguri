@@ -2,13 +2,13 @@ const CACHE_NAME = "donguri-v1";
 
 // キャッシュするファイル一覧
 const CACHE_FILES = [
-  "/",
-  "/index.html",
-  "/script.js",
-  "/style.css",
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
+  "/donguri/",
+  "/donguri/index.html",
+  "/donguri/script.js",
+  "/donguri/style.css",
+  "/donguri/manifest.json",
+  "/donguri/icon-192.png",
+  "/donguri/icon-512.png",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
   "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
