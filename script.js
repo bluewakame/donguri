@@ -273,9 +273,8 @@ function applyTimeDecay(lastVisitMs) {
   if (Date.now() < shieldEnd) return;
 
   const diff = Date.now() - lastVisitMs;
-  // テスト: 5秒ごとに1個 / 本番: 1時間ごとに1個
-  const decayCount = Math.floor(diff / 5000);
-  // const decayCount = Math.floor(diff / (60 * 60 * 1000));
+  // 1時間ごとに1個
+  const decayCount = Math.floor(diff / (60 * 60 * 1000));
 
   if (decayCount > 0 && count > 0) {
     const eaten = Math.min(decayCount, count);
