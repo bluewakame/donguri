@@ -52,6 +52,9 @@ let leaf      = 0;  // 葉っぱ
 let boiled    = 0;  // ゆで済みどんぐり
 let shieldEnd = 0;  // バリア終了時刻（ms）
 
+let shops = [];     // 登録お店リスト
+let editingShopId = null; // 編集中のお店ID
+
 let previousTrees    = 0;
 let map;
 let mapInitialized   = false;
@@ -449,18 +452,41 @@ function spawnAcornOnMap(lat, lng) {
   });
 }
 
-// デモ店舗マーカーを配置
+// 店舗マーカーを地図上に配置
+let shopMarkers = [];
+
 function spawnShops(lat, lng) {
-  const shops = [
-    { offset: [0.0012,  0.0008], name: "カフェ くぬぎ" },
-    { offset: [-0.0008, 0.0015], name: "雑貨店 もみじ" },
-    { offset: [0.0005, -0.0012], name: "ベーカリー どんぐり屋" },
-  ];
+  redrawShopsOnMap(lat, lng);
+}
+
+function redrawShopsOnMap(lat, lng) {
+  // 既存の店舗マーカーを除去
+  shopMarkers.forEach(m => map.removeLayer(m));
+  shopMarkers = [];
+
   const shopIcon = L.divIcon({ html: "🏪", className: "", iconSize: [32, 32] });
-  shops.forEach(s => {
-    L.marker([lat + s.offset[0], lng + s.offset[1]], { icon: shopIcon })
+
+  // 登録済みお店がある場合はその中心付近にランダム配置
+  const list = shops.length > 0 ? shops : [
+    { id: "cafe-kunugi",    name: "カフェ くぬぎ" },
+    { id: "zakka-momiji",   name: "雑貨店 もみじ" },
+    { id: "bakery-donguri", name: "ベーカリー どんぐり屋" },
+  ];
+
+  const offsets = [
+    [ 0.0012,  0.0008],
+    [-0.0008,  0.0015],
+    [ 0.0005, -0.0012],
+    [ 0.0018, -0.0005],
+    [-0.0015,  0.0010],
+  ];
+
+  list.forEach((s, i) => {
+    const off = offsets[i % offsets.length];
+    const m = L.marker([lat + off[0], lng + off[1]], { icon: shopIcon })
       .addTo(map)
       .bindPopup(`<b>${s.name}</b><br>🌰 QRコードでどんぐりゲット！`);
+    shopMarkers.push(m);
   });
 }
 
@@ -538,13 +564,30 @@ function scanTick(video, canvas, ctx) {
 async function handleQrResult(text) {
   stopScanner();
 
-  // QRフォーマット: "donguri:店舗ID"
+  // QRフォーマット: "donguri:店舗ID:時間窓"
   if (!text.startsWith("donguri:")) {
     showQrMessage("❌ このQRは加盟店のものではありません");
     return;
   }
 
-  const shopId  = text.slice("donguri:".length);
+  const parts = text.split(":");
+  if (parts.length < 2) {
+    showQrMessage("❌ QRコードの形式が正しくありません");
+    return;
+  }
+
+  const shopId   = parts[1];
+  const qrWindow = parts.length >= 3 ? parseInt(parts[2]) : null;
+
+  // 時間窓の検証（±1窓 = 最大10分の余裕）
+  if (qrWindow !== null) {
+    const diff = Math.abs(currentQrWindow() - qrWindow);
+    if (diff > 1) {
+      showQrMessage("⏰ このQRコードは期限切れです。お店の画面を再度ご確認ください");
+      return;
+    }
+  }
+
   const today   = new Date().toISOString().slice(0, 10);
   const scanKey = "qr_scan_" + shopId;
 
@@ -588,9 +631,208 @@ function stopScanner() {
 }
 
 // ===========================
+// お店管理
+// ===========================
+
+function loadShops() {
+  try {
+    shops = JSON.parse(localStorage.getItem("managedShops") || "[]");
+  } catch (e) {
+    shops = [];
+  }
+}
+
+function saveShopsToStorage() {
+  localStorage.setItem("managedShops", JSON.stringify(shops));
+}
+
+function renderShopList() {
+  const list = document.getElementById("shop-list");
+  const empty = document.getElementById("shop-empty");
+  list.innerHTML = "";
+
+  if (shops.length === 0) {
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  shops.forEach(shop => {
+    const card = document.createElement("div");
+    card.className = "shop-mgmt-card";
+    card.innerHTML = `
+      <div class="shop-mgmt-info">
+        <span class="shop-mgmt-name">${escapeHtml(shop.name)}</span>
+        <span class="shop-mgmt-id">ID: ${escapeHtml(shop.id)}</span>
+      </div>
+      <div class="shop-mgmt-actions">
+        <button class="shop-action-btn qr-btn" onclick="showShopQR('${escapeHtml(shop.id)}')">QR</button>
+        <button class="shop-action-btn edit-btn" onclick="openEditShopModal('${escapeHtml(shop.id)}')">編集</button>
+        <button class="shop-action-btn del-btn" onclick="deleteShop('${escapeHtml(shop.id)}')">削除</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function openAddShopModal() {
+  editingShopId = null;
+  document.getElementById("addShopTitle").textContent = "🏪 お店を追加";
+  document.getElementById("shopNameInput").value = "";
+  document.getElementById("shopIdInput").value = "";
+  document.getElementById("shopIdInput").disabled = false;
+  document.getElementById("shop-form-msg").textContent = "";
+  document.getElementById("addShopModal").style.display = "block";
+  document.getElementById("addShopOverlay").style.display = "block";
+  document.getElementById("shopNameInput").focus();
+}
+
+function openEditShopModal(shopId) {
+  const shop = shops.find(s => s.id === shopId);
+  if (!shop) return;
+  editingShopId = shopId;
+  document.getElementById("addShopTitle").textContent = "🏪 お店を編集";
+  document.getElementById("shopNameInput").value = shop.name;
+  document.getElementById("shopIdInput").value = shop.id;
+  document.getElementById("shopIdInput").disabled = true;
+  document.getElementById("shop-form-msg").textContent = "";
+  document.getElementById("addShopModal").style.display = "block";
+  document.getElementById("addShopOverlay").style.display = "block";
+  document.getElementById("shopNameInput").focus();
+}
+
+function closeAddShopModal() {
+  document.getElementById("addShopModal").style.display = "none";
+  document.getElementById("addShopOverlay").style.display = "none";
+}
+
+function saveShop() {
+  const name = document.getElementById("shopNameInput").value.trim();
+  const id   = document.getElementById("shopIdInput").value.trim();
+  const msg  = document.getElementById("shop-form-msg");
+
+  if (!name) { msg.textContent = "❌ お店の名前を入力してください"; return; }
+  if (!editingShopId) {
+    if (!id) { msg.textContent = "❌ お店のIDを入力してください"; return; }
+    if (!/^[a-zA-Z0-9\-_]+$/.test(id)) {
+      msg.textContent = "❌ IDは英数字・ハイフン・アンダースコアのみ使えます";
+      return;
+    }
+    if (shops.some(s => s.id === id)) {
+      msg.textContent = "❌ このIDはすでに使われています";
+      return;
+    }
+    shops.push({ id, name, createdAt: Date.now() });
+  } else {
+    const shop = shops.find(s => s.id === editingShopId);
+    if (shop) shop.name = name;
+  }
+
+  saveShopsToStorage();
+  renderShopList();
+  closeAddShopModal();
+
+  // 地図が初期化済みなら店舗マーカーを再描画
+  if (mapInitialized && playerMarker) {
+    const latlng = playerMarker.getLatLng();
+    redrawShopsOnMap(latlng.lat, latlng.lng);
+  }
+}
+
+function deleteShop(shopId) {
+  const shop = shops.find(s => s.id === shopId);
+  if (!shop) return;
+  if (!confirm(`「${shop.name}」を削除しますか？`)) return;
+  shops = shops.filter(s => s.id !== shopId);
+  saveShopsToStorage();
+  renderShopList();
+}
+
+// QRコードの時間窓（5分 = 300秒）
+const QR_WINDOW_SEC = 300;
+
+function currentQrWindow() {
+  return Math.floor(Date.now() / (QR_WINDOW_SEC * 1000));
+}
+
+let qrCountdownTimer  = null;
+let qrRefreshShopId   = null;
+
+function showShopQR(shopId) {
+  const shop = shops.find(s => s.id === shopId);
+  if (!shop) return;
+
+  qrRefreshShopId = shopId;
+  document.getElementById("qrShopName").textContent = shop.name;
+  document.getElementById("qrDisplayModal").style.display  = "block";
+  document.getElementById("qrDisplayOverlay").style.display = "block";
+
+  renderTimedQR(shop);
+  startQrCountdown(shop);
+}
+
+function renderTimedQR(shop) {
+  const win  = currentQrWindow();
+  const text = `donguri:${shop.id}:${win}`;
+
+  document.getElementById("qrShopId").textContent = text;
+
+  const wrap = document.getElementById("qrCanvas");
+  wrap.innerHTML = "";
+  new QRCode(wrap, {
+    text,
+    width:  200,
+    height: 200,
+    colorDark:  "#2c3e50",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+function startQrCountdown(shop) {
+  if (qrCountdownTimer) clearInterval(qrCountdownTimer);
+
+  const countEl = document.getElementById("qrCountdown");
+
+  function tick() {
+    const elapsed = Math.floor(Date.now() / 1000) % QR_WINDOW_SEC;
+    const remaining = QR_WINDOW_SEC - elapsed;
+    countEl.textContent = `🔄 ${remaining}秒後に更新`;
+
+    if (remaining <= 1) {
+      renderTimedQR(shop);
+    }
+  }
+
+  tick();
+  qrCountdownTimer = setInterval(tick, 1000);
+}
+
+function closeQrDisplay() {
+  document.getElementById("qrDisplayModal").style.display  = "none";
+  document.getElementById("qrDisplayOverlay").style.display = "none";
+  if (qrCountdownTimer) {
+    clearInterval(qrCountdownTimer);
+    qrCountdownTimer = null;
+  }
+  qrRefreshShopId = null;
+}
+
+// ===========================
 // 起動
 // ===========================
 
 window.onload = function () {
+  loadShops();
+  renderShopList();
   initApp();
 };
