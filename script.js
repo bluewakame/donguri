@@ -435,7 +435,16 @@ function startScanner() {
   // バックカメラで試み、失敗したらフロントカメラで再試行（iOS対応）
   qrScanner = new Html5Qrcode("reader");
   qrScanner.start({ facingMode: { ideal: "environment" } }, config, onScan, () => {})
-    .then(() => { scannerRunning = true; })
+    .then(() => {
+      scannerRunning = true;
+      // iOS Safari: playsinline を確実に付与して映像を表示
+      const video = document.querySelector("#reader video");
+      if (video) {
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("muted", "true");
+        video.play().catch(() => {});
+      }
+    })
     .catch(err => {
       if (isPermissionError(err)) {
         showQrMessage("📷 カメラへのアクセスを許可してください");

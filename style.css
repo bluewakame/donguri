@@ -175,9 +175,17 @@ button:active { background-color: #5e7a52; }
 
 #reader {
   width: 300px;
+  min-height: 300px;
   margin: 0 auto 12px;
   border-radius: 12px;
   overflow: hidden;
+  background: #000;
+}
+
+#reader video {
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
 }
 
 /* ===========================
