@@ -1,0 +1,296 @@
+/* ===========================
+   ベース
+   =========================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #f4f8f2;
+  font-family: sans-serif;
+  text-align: center;
+  padding-bottom: 72px; /* ナビ分の余白 */
+}
+
+.container {
+  max-width: 500px;
+  margin: auto;
+  padding: 20px 16px;
+}
+
+h1 {
+  font-size: 22px;
+  color: #2c3e50;
+  margin-bottom: 16px;
+}
+
+/* ===========================
+   ページ切り替え
+   =========================== */
+
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+/* ===========================
+   ステータスグリッド
+   =========================== */
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.status-card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.status-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.status-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #2c3e50;
+  transition: transform 0.2s;
+}
+
+.gold  { color: #f1c40f !important; }
+.boiled { color: #e67e22 !important; }
+
+/* ===========================
+   メッセージ
+   =========================== */
+
+#message, #qr-message {
+  min-height: 1.5em;
+  color: #555;
+  font-size: 15px;
+  margin: 8px 0;
+}
+
+#caterpillar {
+  font-size: 24px;
+  margin: 4px;
+}
+
+.warning-banner {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  font-size: 14px;
+  color: #856404;
+}
+
+/* ===========================
+   ボタン
+   =========================== */
+
+button {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  font-size: 16px;
+  padding: 13px;
+  margin: 7px auto;
+  background-color: #7c9a6d;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s;
+}
+
+button:active { background-color: #5e7a52; }
+
+#acornButton { transition: transform 0.15s ease; }
+#acornButton:active { transform: scale(0.93); }
+.bump { transform: scale(1.15) !important; }
+
+#boilButton { background-color: #c0392b; }
+#boilButton:active { background-color: #922b21; }
+
+.gold-btn { background-color: #d4a017; }
+.gold-btn:active { background-color: #a87c10; }
+
+.reset-btn { background-color: #95a5a6; font-size: 14px; }
+.reset-btn:active { background-color: #717d7e; }
+
+/* ===========================
+   森ページ
+   =========================== */
+
+.forest-display {
+  font-size: 28px;
+  letter-spacing: 4px;
+  margin: 8px 0 4px;
+  min-height: 2em;
+}
+
+#forestLevel {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 12px;
+}
+
+#map {
+  height: 420px;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+}
+
+/* ===========================
+   QRページ
+   =========================== */
+
+.qr-desc {
+  color: #666;
+  font-size: 15px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+#reader {
+  width: 300px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* ===========================
+   金どんぐりショップ
+   =========================== */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 900;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 16px;
+  padding: 24px 20px;
+  z-index: 1000;
+  width: 92%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.modal h2 { color: #2c3e50; margin-bottom: 8px; }
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 10px 0;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.shop-item:hover { background: #e8f5e9; }
+.shop-item p { margin: 4px 0 0; font-size: 13px; color: #666; }
+.shop-icon { font-size: 32px; flex-shrink: 0; }
+
+/* ===========================
+   下部ナビゲーション
+   =========================== */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  z-index: 800;
+}
+
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 8px 0;
+  max-width: none;
+  width: auto;
+  color: #aaa;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-btn.active {
+  color: #5a8a4a;
+  background: transparent;
+}
+
+.nav-btn:active {
+  background: #f0f0f0;
+}
+
+.nav-icon { font-size: 24px; line-height: 1; }
+.nav-label { font-size: 11px; font-weight: 500; }
+
+/* アクティブタブに緑のアンダーライン */
+.nav-btn.active::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 3px;
+  background: #5a8a4a;
+  border-radius: 2px;
+  margin-top: 2px;
+}
+
+@media (min-width: 768px) {
+  .bottom-nav {
+    max-width: 500px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 16px 16px 0 0;
+    border-left: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0;
+  }
+}
