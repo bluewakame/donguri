@@ -399,7 +399,11 @@ function startScanner() {
   document.getElementById("scanStopBtn").style.display  = "inline-block";
   showQrMessage("📷 QRコードをカメラに向けてください");
 
-  if (qrScanner) qrScanner.stop().catch(() => {});
+  if (qrScanner) {
+    qrScanner.stop().catch(() => {});
+    qrScanner = null;
+  }
+  document.getElementById("reader").innerHTML = "";
   let lastScanned = null;
   const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
@@ -460,6 +464,7 @@ function startScanner() {
             ? "📷 カメラへのアクセスを許可してください"
             : "📷 カメラの起動に失敗しました");
           console.error(err2);
+          qrScanner = null;
           resetScannerUI();
         });
     });
