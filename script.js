@@ -400,46 +400,60 @@ function startScanner() {
   showQrMessage("📷 QRコードをカメラに向けてください");
 
   if (qrScanner) qrScanner.stop().catch(() => {});
-  qrScanner = new Html5Qrcode("reader");
   let lastScanned = null;
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-  qrScanner.start(
-    { facingMode: { ideal: "environment" } },
-    { fps: 10, qrbox: { width: 250, height: 250 } },
-    async (decodedText) => {
-      if (lastScanned === decodedText) return;
-      lastScanned = decodedText;
-      setTimeout(() => { lastScanned = null; }, 2000);
+  const onScan = async (decodedText) => {
+    if (lastScanned === decodedText) return;
+    lastScanned = decodedText;
+    setTimeout(() => { lastScanned = null; }, 2000);
 
-      if (decodedText.startsWith(VALID_QR_PREFIX)) {
-        const shopName  = decodedText.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
-        const isPremium = decodedText.includes("_PREMIUM");
-        count++;
-        if (isPremium && Math.random() < 0.10) {
-          gold++;
-          document.getElementById("gold").textContent = gold;
-          showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
-        } else {
-          showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
-        }
-        document.getElementById("count").textContent = count;
-        updateForest();
-        await saveData();
+    if (decodedText.startsWith(VALID_QR_PREFIX)) {
+      const shopName  = decodedText.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
+      const isPremium = decodedText.includes("_PREMIUM");
+      count++;
+      if (isPremium && Math.random() < 0.10) {
+        gold++;
+        document.getElementById("gold").textContent = gold;
+        showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
       } else {
-        showQrMessage("❌ このQRは加盟店のものではありません");
+        showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
       }
-      stopScanner();
-    },
-    () => {}
-  ).then(() => { scannerRunning = true; })
-  .catch(err => {
-    const msg = (err && err.message && err.message.includes("Permission"))
-      ? "📷 カメラへのアクセスを許可してください"
-      : "📷 カメラの起動に失敗しました";
-    showQrMessage(msg);
-    console.error(err);
-    resetScannerUI();
-  });
+      document.getElementById("count").textContent = count;
+      updateForest();
+      await saveData();
+    } else {
+      showQrMessage("❌ このQRは加盟店のものではありません");
+    }
+    stopScanner();
+  };
+
+  const isPermissionError = (err) =>
+    err && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError" ||
+      (err.message && err.message.toLowerCase().includes("permission")));
+
+  // バックカメラで試み、失敗したらフロントカメラで再試行（iOS対応）
+  qrScanner = new Html5Qrcode("reader");
+  qrScanner.start({ facingMode: { ideal: "environment" } }, config, onScan, () => {})
+    .then(() => { scannerRunning = true; })
+    .catch(err => {
+      if (isPermissionError(err)) {
+        showQrMessage("📷 カメラへのアクセスを許可してください");
+        resetScannerUI();
+        return;
+      }
+      // OverconstrainedError 等の場合はカメラ指定なしで再試行
+      qrScanner = new Html5Qrcode("reader");
+      qrScanner.start({ facingMode: "user" }, config, onScan, () => {})
+        .then(() => { scannerRunning = true; })
+        .catch(err2 => {
+          showQrMessage(isPermissionError(err2)
+            ? "📷 カメラへのアクセスを許可してください"
+            : "📷 カメラの起動に失敗しました");
+          console.error(err2);
+          resetScannerUI();
+        });
+    });
 }
 
 function stopScanner() {
