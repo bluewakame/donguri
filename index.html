@@ -23,26 +23,33 @@
 
       <div class="status-grid">
         <div class="status-card">
-          <span class="status-label">どんぐり 🌰</span>
+          <span class="status-label">どんぐり</span>
           <span id="count" class="status-value">0</span>
         </div>
         <div class="status-card">
-          <span class="status-label">金どんぐり ✨</span>
+          <span class="status-label">金どんぐり</span>
           <span id="gold" class="status-value gold">0</span>
         </div>
         <div class="status-card">
-          <span class="status-label">葉っぱ 🌿</span>
+          <span class="status-label">はっぱ</span>
           <span id="leafCount" class="status-value">0</span>
+        </div>
+        <div class="status-card">
+          <span class="status-label">ゆで済み🔒</span>
+          <span id="boiledCount" class="status-value boiled">0</span>
         </div>
       </div>
 
       <p id="message"></p>
+      <p id="caterpillar"></p>
 
-      <div id="bugWarning" class="warning-banner" style="display:none;">
-        🐛 虫にどんぐりが食べられました！地図を探索して増やそう！
+      <div id="caterpillarWarning" class="warning-banner" style="display:none;">
+        🐛 どんぐりが毛虫に狙われています！今すぐゆでて守ろう！
       </div>
 
-      <button onclick="exchangeLeaf()">🌿 5枚 → 🌰 1個 交換</button>
+      <button id="boilButton" onclick="boilAcorns()">🫕 ゆでる（毛虫から守る）</button>
+      <button onclick="exchangeLeaf()">🌿5 → 🌰1 交換</button>
+      <button class="gold-btn" onclick="openGoldShop()">✨ 金どんぐりショップ</button>
       <button class="reset-btn" onclick="resetGame()">🔄 リセット</button>
     </div>
   </div>
@@ -76,6 +83,35 @@
       <button id="scanStartBtn" onclick="startScanner()">📷 スキャン開始</button>
       <button id="scanStopBtn" onclick="stopScanner()" style="display:none; background:#c0392b;">⏹ スキャン停止</button>
     </div>
+  </div>
+
+  <!-- ========== 金どんぐりショップ モーダル ========== -->
+  <div id="goldShopOverlay" class="overlay" style="display:none;" onclick="closeGoldShop()"></div>
+  <div id="goldShop" class="modal" style="display:none;">
+    <h2>✨ 金どんぐりショップ</h2>
+    <p>所持: <span id="goldInShop">0</span> 個</p>
+    <div class="shop-item" onclick="buyItem('boost')">
+      <span class="shop-icon">⚡</span>
+      <div>
+        <strong>どんぐり×5ボーナス</strong>
+        <p>金どんぐり 1個で交換</p>
+      </div>
+    </div>
+    <div class="shop-item" onclick="buyItem('shield')">
+      <span class="shop-icon">🛡️</span>
+      <div>
+        <strong>毛虫バリア（24時間）</strong>
+        <p>金どんぐり 3個で交換</p>
+      </div>
+    </div>
+    <div class="shop-item" onclick="buyItem('leaf')">
+      <span class="shop-icon">🌿</span>
+      <div>
+        <strong>はっぱ×10</strong>
+        <p>金どんぐり 2個で交換</p>
+      </div>
+    </div>
+    <button onclick="closeGoldShop()">閉じる</button>
   </div>
 
   <!-- ========== 下部ナビゲーション ========== -->

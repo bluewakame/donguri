@@ -46,9 +46,11 @@ const USER_KEY = getUserKey();
 // 状態変数
 // ===========================
 
-let count = 0;  // どんぐり
-let gold  = 0;  // 金どんぐり
-let leaf  = 0;  // 葉っぱ
+let count     = 0;  // どんぐり
+let gold      = 0;  // 金どんぐり
+let leaf      = 0;  // 葉っぱ
+let boiled    = 0;  // ゆで済みどんぐり
+let shieldEnd = 0;  // バリア終了時刻（ms）
 
 let previousTrees    = 0;
 let map;
@@ -73,26 +75,32 @@ async function initApp() {
   try {
     const row = await sbGet(USER_KEY);
     if (row) {
-      count = row.acorn_count || 0;
-      gold  = row.gold_count  || 0;
-      leaf  = row.leaf_count  || 0;
+      count     = row.acorn_count  || 0;
+      gold      = row.gold_count   || 0;
+      leaf      = row.leaf_count   || 0;
+      boiled    = row.boiled_count || 0;
+      shieldEnd = row.shield_end   || 0;
       applyTimeDecay(row.last_visit || 0);
     } else {
       await sbUpsert(USER_KEY, {
-        acorn_count: 0, gold_count: 0, leaf_count: 0, last_visit: Date.now()
+        acorn_count: 0, gold_count: 0, leaf_count: 0,
+        boiled_count: 0, shield_end: 0, last_visit: Date.now()
       });
     }
   } catch (e) {
     console.warn("Supabase接続失敗、ローカルデータを使用:", e);
-    count = parseInt(localStorage.getItem("acornCount")) || 0;
-    gold  = parseInt(localStorage.getItem("goldCount"))  || 0;
-    leaf  = parseInt(localStorage.getItem("leafCount"))  || 0;
+    count     = parseInt(localStorage.getItem("acornCount"))  || 0;
+    gold      = parseInt(localStorage.getItem("goldCount"))   || 0;
+    leaf      = parseInt(localStorage.getItem("leafCount"))   || 0;
+    boiled    = parseInt(localStorage.getItem("boiledCount")) || 0;
+    shieldEnd = parseInt(localStorage.getItem("shieldEnd"))   || 0;
     applyTimeDecay(parseInt(localStorage.getItem("lastVisit")) || 0);
   }
 
-  previousTrees = Math.floor(count / 10);
+  previousTrees = Math.floor((count + boiled) / 10);
   refreshUI();
   updateForest();
+  checkShieldWarning();
   showMessage("");
 }
 
@@ -102,17 +110,21 @@ async function initApp() {
 
 async function saveData() {
   const now = Date.now();
-  localStorage.setItem("acornCount", count);
-  localStorage.setItem("goldCount",  gold);
-  localStorage.setItem("leafCount",  leaf);
-  localStorage.setItem("lastVisit",  now);
+  localStorage.setItem("acornCount",  count);
+  localStorage.setItem("goldCount",   gold);
+  localStorage.setItem("leafCount",   leaf);
+  localStorage.setItem("boiledCount", boiled);
+  localStorage.setItem("shieldEnd",   shieldEnd);
+  localStorage.setItem("lastVisit",   now);
 
   try {
     await sbUpsert(USER_KEY, {
-      acorn_count: count,
-      gold_count:  gold,
-      leaf_count:  leaf,
-      last_visit:  now
+      acorn_count:  count,
+      gold_count:   gold,
+      leaf_count:   leaf,
+      boiled_count: boiled,
+      shield_end:   shieldEnd,
+      last_visit:   now
     });
   } catch (e) {
     console.warn("保存失敗（次回起動時に同期）:", e);
@@ -141,9 +153,10 @@ function showPage(name) {
 // ===========================
 
 function refreshUI() {
-  document.getElementById("count").textContent     = count;
-  document.getElementById("gold").textContent      = gold;
-  document.getElementById("leafCount").textContent = leaf;
+  document.getElementById("count").textContent       = count;
+  document.getElementById("gold").textContent        = gold;
+  document.getElementById("leafCount").textContent   = leaf;
+  document.getElementById("boiledCount").textContent = boiled;
 }
 
 function showMessage(text) {
@@ -177,9 +190,11 @@ async function exchangeLeaf() {
 
 async function resetGame() {
   if (!confirm("本当にリセットしますか？")) return;
-  count = 0;
-  gold  = 0;
-  leaf  = 0;
+  count     = 0;
+  gold      = 0;
+  leaf      = 0;
+  boiled    = 0;
+  shieldEnd = 0;
   refreshUI();
   updateForest();
   showMessage("");
@@ -187,23 +202,86 @@ async function resetGame() {
 }
 
 // ===========================
+// 🫕 ゆでる
+// ===========================
+
+async function boilAcorns() {
+  if (count <= 0) { showMessage("🌰 ゆでるどんぐりがない"); return; }
+  const n = count;
+  boiled += n;
+  count = 0;
+  refreshUI();
+  updateForest();
+  showMessage("🫕 " + n + "個ゆでた！毛虫から守られたよ");
+  document.getElementById("caterpillarWarning").style.display = "none";
+  document.getElementById("caterpillar").textContent = "";
+  await saveData();
+}
+
+// ===========================
+// 金どんぐりショップ
+// ===========================
+
+function openGoldShop() {
+  document.getElementById("goldInShop").textContent = gold;
+  document.getElementById("goldShop").style.display = "block";
+  document.getElementById("goldShopOverlay").style.display = "block";
+}
+
+function closeGoldShop() {
+  document.getElementById("goldShop").style.display = "none";
+  document.getElementById("goldShopOverlay").style.display = "none";
+}
+
+async function buyItem(type) {
+  if (type === "boost") {
+    if (gold < 1) { showMessage("✨ 金どんぐりが足りない"); closeGoldShop(); return; }
+    gold--; count += 5;
+    showMessage("⚡ どんぐりが5個増えた！");
+  } else if (type === "shield") {
+    if (gold < 3) { showMessage("✨ 金どんぐりが足りない（3個必要）"); closeGoldShop(); return; }
+    gold -= 3;
+    shieldEnd = Date.now() + 24 * 60 * 60 * 1000;
+    showMessage("🛡️ 毛虫バリア発動！24時間守るよ");
+    checkShieldWarning();
+  } else if (type === "leaf") {
+    if (gold < 2) { showMessage("✨ 金どんぐりが足りない（2個必要）"); closeGoldShop(); return; }
+    gold -= 2; leaf += 10;
+    showMessage("🌿 はっぱが10枚増えた！");
+  }
+  refreshUI();
+  updateForest();
+  document.getElementById("goldInShop").textContent = gold;
+  closeGoldShop();
+  await saveData();
+}
+
+function checkShieldWarning() {
+  if (Date.now() < shieldEnd) {
+    const remaining = Math.ceil((shieldEnd - Date.now()) / (60 * 60 * 1000));
+    document.getElementById("caterpillarWarning").style.display = "none";
+    showMessage("🛡️ バリア有効中（残り約" + remaining + "時間）");
+  }
+}
+
+// ===========================
 // 時間減衰（🐛 虫に食べられる）
 // ===========================
 
 function applyTimeDecay(lastVisitMs) {
-  if (!lastVisitMs || count <= 0) return;
+  if (!lastVisitMs) return;
+  if (Date.now() < shieldEnd) return;
+
   const diff       = Date.now() - lastVisitMs;
   const decayCount = Math.floor(diff / (60 * 60 * 1000)); // 1時間ごとに1個
-  if (decayCount <= 0) return;
 
-  const eaten = Math.min(decayCount, count);
-  count = Math.max(0, count - eaten);
-  showMessage("🐛 " + eaten + " 個食べられた！");
-  document.getElementById("bugWarning").style.display = "block";
-  setTimeout(() => {
-    document.getElementById("bugWarning").style.display = "none";
-    showMessage("");
-  }, 6000);
+  if (decayCount > 0 && count > 0) {
+    const eaten = Math.min(decayCount, count);
+    count = Math.max(0, count - eaten);
+    showMessage("🐛 " + eaten + "個食べられた！「ゆでる」で守れるよ");
+    document.getElementById("caterpillar").textContent = "🐛";
+    document.getElementById("caterpillarWarning").style.display = "block";
+  }
 }
 
 // ===========================
@@ -211,8 +289,9 @@ function applyTimeDecay(lastVisitMs) {
 // ===========================
 
 function updateForest() {
-  const trees = Math.floor(count / 10);
-  let display = "";
+  const total  = count + boiled;
+  const trees  = Math.floor(total / 10);
+  let display  = "";
   for (let i = 0; i < trees; i++) display += "🌳";
   document.getElementById("forest").textContent = display || "　";
 
@@ -228,15 +307,16 @@ function updateForest() {
 }
 
 function updateNextTree() {
-  const rem  = count % 10;
-  const left = rem === 0 ? 10 : 10 - rem;
-  const el   = document.getElementById("nextTree");
+  const total = count + boiled;
+  const rem   = total % 10;
+  const left  = rem === 0 ? 10 : 10 - rem;
+  const el    = document.getElementById("nextTree");
   el.textContent = left;
   el.style.color = left <= 3 ? "#c0392b" : left <= 5 ? "#e67e22" : "#2c3e50";
 }
 
 function updateForestLevel() {
-  const trees  = Math.floor(count / 10);
+  const trees  = Math.floor((count + boiled) / 10);
   const levels = ["まだ森はない", "🌱 小さな森", "🌿 若い森", "🌳 深い森"];
   const idx    = trees === 0 ? 0 : trees <= 3 ? 1 : trees <= 7 ? 2 : 3;
   document.getElementById("forestLevel").textContent = levels[idx];
