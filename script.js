@@ -378,13 +378,21 @@ function spawnLeaf(lat, lng) {
     [lat + (Math.random() - 0.5) * 0.001, lng + (Math.random() - 0.5) * 0.001],
     { icon }
   ).addTo(map);
-  m.on("click", async function () {
+  m.on("click", async function (e) {
+    L.DomEvent.stop(e);
     leaf++;
     document.getElementById("leafCount").textContent = leaf;
     map.removeLayer(m);
-    showMessage("🌿 はっぱをゲット！");
+    showForestMessage("🌿 はっぱをゲット！（合計 " + leaf + " 枚）");
     await saveData();
   });
+}
+
+function showForestMessage(text) {
+  const el = document.getElementById("forest-message");
+  el.textContent = text;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
 // ===========================
