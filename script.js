@@ -376,10 +376,11 @@ function spawnLeaf(lat, lng) {
   const icon = L.divIcon({ html: "🌿", className: "", iconSize: [30, 30] });
   const m = L.marker(
     [lat + (Math.random() - 0.5) * 0.001, lng + (Math.random() - 0.5) * 0.001],
-    { icon }
+    { icon, bubblingMouseEvents: false }
   ).addTo(map);
   m.on("click", async function (e) {
-    L.DomEvent.stop(e);
+    L.DomEvent.stopPropagation(e);
+    L.DomEvent.preventDefault(e);
     leaf++;
     document.getElementById("leafCount").textContent = leaf;
     map.removeLayer(m);
