@@ -8,10 +8,7 @@ const CACHE_FILES = [
   "/donguri/style.css",
   "/donguri/manifest.json",
   "/donguri/icon-192.png",
-  "/donguri/icon-512.png",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
-  "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+  "/donguri/icon-512.png"
 ];
 
 // インストール時：ファイルをキャッシュ
@@ -57,7 +54,7 @@ self.addEventListener("fetch", function (e) {
     }).catch(() => {
       // オフラインでHTMLリクエストの場合はindex.htmlを返す
       if (e.request.destination === "document") {
-        return caches.match("/index.html");
+        return caches.match("/donguri/index.html");
       }
     })
   );

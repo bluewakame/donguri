@@ -176,7 +176,6 @@ function showQrMessage(text) {
 
 function addAcorn() {
   showPage("qr");
-  setTimeout(startScanner, 300);
 }
 
 // ===========================
@@ -273,9 +272,8 @@ function applyTimeDecay(lastVisitMs) {
   if (Date.now() < shieldEnd) return;
 
   const diff = Date.now() - lastVisitMs;
-  // テスト: 5秒ごとに1個 / 本番: 1時間ごとに1個
-  const decayCount = Math.floor(diff / 5000);
-  // const decayCount = Math.floor(diff / (60 * 60 * 1000));
+  // 1時間ごとに1個
+  const decayCount = Math.floor(diff / (60 * 60 * 1000));
 
   if (decayCount > 0 && count > 0) {
     const eaten = Math.min(decayCount, count);
@@ -405,48 +403,40 @@ function startScanner() {
   qrScanner = new Html5Qrcode("reader");
   let lastScanned = null;
 
-  Html5Qrcode.getCameras().then(devices => {
-    if (devices.length === 0) {
-      showQrMessage("📷 カメラが見つかりません");
-      resetScannerUI();
-      return;
-    }
-    qrScanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      async (decodedText) => {
-        if (lastScanned === decodedText) return;
-        lastScanned = decodedText;
-        setTimeout(() => { lastScanned = null; }, 2000);
+  qrScanner.start(
+    { facingMode: { ideal: "environment" } },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    async (decodedText) => {
+      if (lastScanned === decodedText) return;
+      lastScanned = decodedText;
+      setTimeout(() => { lastScanned = null; }, 2000);
 
-        if (decodedText.startsWith(VALID_QR_PREFIX)) {
-          const shopName  = decodedText.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
-          const isPremium = decodedText.includes("_PREMIUM");
-          count++;
-          if (isPremium && Math.random() < 0.10) {
-            gold++;
-            document.getElementById("gold").textContent = gold;
-            showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
-          } else {
-            showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
-          }
-          document.getElementById("count").textContent = count;
-          updateForest();
-          await saveData();
+      if (decodedText.startsWith(VALID_QR_PREFIX)) {
+        const shopName  = decodedText.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
+        const isPremium = decodedText.includes("_PREMIUM");
+        count++;
+        if (isPremium && Math.random() < 0.10) {
+          gold++;
+          document.getElementById("gold").textContent = gold;
+          showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
         } else {
-          showQrMessage("❌ このQRは加盟店のものではありません");
+          showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
         }
-        stopScanner();
-      },
-      () => {}
-    ).then(() => { scannerRunning = true; })
-    .catch(err => {
-      showQrMessage("📷 カメラの起動に失敗しました");
-      console.error(err);
-      resetScannerUI();
-    });
-  }).catch(err => {
-    showQrMessage("📷 カメラへのアクセスを許可してください");
+        document.getElementById("count").textContent = count;
+        updateForest();
+        await saveData();
+      } else {
+        showQrMessage("❌ このQRは加盟店のものではありません");
+      }
+      stopScanner();
+    },
+    () => {}
+  ).then(() => { scannerRunning = true; })
+  .catch(err => {
+    const msg = (err && err.message && err.message.includes("Permission"))
+      ? "📷 カメラへのアクセスを許可してください"
+      : "📷 カメラの起動に失敗しました";
+    showQrMessage(msg);
     console.error(err);
     resetScannerUI();
   });
