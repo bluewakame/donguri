@@ -380,6 +380,15 @@ function spawnLeaf(lat, lng) {
   ).addTo(map);
   m.on("click", async function (e) {
     L.DomEvent.stop(e);
+    if (e.originalEvent) {
+      e.originalEvent.stopPropagation();
+      e.originalEvent.preventDefault();
+    }
+    // ゴーストクリックがナビボタンに届かないよう一時的に無効化
+    const nav = document.querySelector(".bottom-nav");
+    nav.style.pointerEvents = "none";
+    setTimeout(() => { nav.style.pointerEvents = ""; }, 500);
+
     leaf++;
     document.getElementById("leafCount").textContent = leaf;
     map.removeLayer(m);
