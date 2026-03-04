@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="どんぐり">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
 
@@ -71,7 +71,10 @@
     <div class="container">
       <h1>📷 QRスキャン</h1>
       <p class="qr-desc">加盟店のQRコードを読み取って<br>どんぐりをゲット！</p>
-      <div id="reader"></div>
+      <div id="scanner-wrap" style="display:none">
+        <video id="scanner-video" playsinline muted></video>
+      </div>
+      <canvas id="scanner-canvas" style="display:none"></canvas>
       <p id="qr-message"></p>
       <button id="scanStartBtn" onclick="startScanner()">📷 スキャン開始</button>
       <button id="scanStopBtn" onclick="stopScanner()" style="display:none; background:#c0392b;">⏹ スキャン停止</button>

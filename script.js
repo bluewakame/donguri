@@ -56,8 +56,8 @@ let shieldEnd = 0;
 let previousTrees  = 0;
 let map;
 let mapInitialized = false;
-let qrScanner      = null;
-let scannerRunning = false;
+let scanStream    = null;
+let scanAnimFrame = null;
 
 // ===========================
 // 起動：Supabaseからデータ読み込み
@@ -148,7 +148,7 @@ function showPage(name) {
     mapInitialized = true;
     setTimeout(initMap, 100);
   }
-  if (name !== "qr" && scannerRunning) stopScanner();
+  if (name !== "qr") stopScanner();
 }
 
 // ===========================
@@ -388,98 +388,103 @@ function spawnLeaf(lat, lng) {
 }
 
 // ===========================
-// QRスキャナー
+// QRスキャナー（ネイティブ実装）
 // ===========================
 
 const VALID_QR_PREFIX = "DONGURI_SHOP_";
 
-function startScanner() {
-  if (scannerRunning) return;
+async function startScanner() {
+  showQrMessage("📷 カメラを起動中...");
   document.getElementById("scanStartBtn").style.display = "none";
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }
+    });
+  } catch (err) {
+    showQrMessage(
+      (err.name === "NotAllowedError" || err.name === "PermissionDeniedError")
+        ? "📷 カメラへのアクセスを許可してください"
+        : "📷 カメラの起動に失敗しました"
+    );
+    document.getElementById("scanStartBtn").style.display = "inline-block";
+    return;
+  }
+
+  scanStream = stream;
+  const video = document.getElementById("scanner-video");
+  video.srcObject = stream;
+
+  try {
+    await video.play();
+  } catch (err) {
+    showQrMessage("📷 映像の表示に失敗しました");
+    stopScanner();
+    return;
+  }
+
+  document.getElementById("scanner-wrap").style.display = "block";
   document.getElementById("scanStopBtn").style.display  = "inline-block";
   showQrMessage("📷 QRコードをカメラに向けてください");
 
-  if (qrScanner) {
-    qrScanner.stop().catch(() => {});
-    qrScanner = null;
-  }
-  document.getElementById("reader").innerHTML = "";
-  let lastScanned = null;
-  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+  const canvas = document.getElementById("scanner-canvas");
+  const ctx    = canvas.getContext("2d", { willReadFrequently: true });
+  scanTick(video, canvas, ctx);
+}
 
-  const onScan = async (decodedText) => {
-    if (lastScanned === decodedText) return;
-    lastScanned = decodedText;
-    setTimeout(() => { lastScanned = null; }, 2000);
-
-    if (decodedText.startsWith(VALID_QR_PREFIX)) {
-      const shopName  = decodedText.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
-      const isPremium = decodedText.includes("_PREMIUM");
-      count++;
-      if (isPremium && Math.random() < 0.10) {
-        gold++;
-        document.getElementById("gold").textContent = gold;
-        showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
-      } else {
-        showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
-      }
-      document.getElementById("count").textContent = count;
-      updateForest();
-      await saveData();
-    } else {
-      showQrMessage("❌ このQRは加盟店のものではありません");
-    }
-    stopScanner();
-  };
-
-  const isPermissionError = (err) =>
-    err && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError" ||
-      (err.message && err.message.toLowerCase().includes("permission")));
-
-  // バックカメラで試み、失敗したらフロントカメラで再試行（iOS対応）
-  qrScanner = new Html5Qrcode("reader");
-  qrScanner.start({ facingMode: { ideal: "environment" } }, config, onScan, () => {})
-    .then(() => {
-      scannerRunning = true;
-      // iOS Safari: playsinline を確実に付与して映像を表示
-      const video = document.querySelector("#reader video");
-      if (video) {
-        video.setAttribute("playsinline", "true");
-        video.setAttribute("muted", "true");
-        video.play().catch(() => {});
-      }
-    })
-    .catch(err => {
-      if (isPermissionError(err)) {
-        showQrMessage("📷 カメラへのアクセスを許可してください");
-        resetScannerUI();
-        return;
-      }
-      // OverconstrainedError 等の場合はカメラ指定なしで再試行
-      qrScanner = new Html5Qrcode("reader");
-      qrScanner.start({ facingMode: "user" }, config, onScan, () => {})
-        .then(() => { scannerRunning = true; })
-        .catch(err2 => {
-          showQrMessage(isPermissionError(err2)
-            ? "📷 カメラへのアクセスを許可してください"
-            : "📷 カメラの起動に失敗しました");
-          console.error(err2);
-          qrScanner = null;
-          resetScannerUI();
-        });
+function scanTick(video, canvas, ctx) {
+  if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert"
     });
+    if (code && code.data) {
+      handleQrResult(code.data);
+      return;
+    }
+  }
+  scanAnimFrame = requestAnimationFrame(() => scanTick(video, canvas, ctx));
+}
+
+async function handleQrResult(text) {
+  stopScanner();
+  if (text.startsWith(VALID_QR_PREFIX)) {
+    const shopName  = text.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
+    const isPremium = text.includes("_PREMIUM");
+    count++;
+    if (isPremium && Math.random() < 0.10) {
+      gold++;
+      document.getElementById("gold").textContent = gold;
+      showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
+    } else {
+      showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
+    }
+    document.getElementById("count").textContent = count;
+    updateForest();
+    await saveData();
+  } else {
+    showQrMessage("❌ このQRは加盟店のものではありません");
+  }
 }
 
 function stopScanner() {
-  if (qrScanner) { qrScanner.stop().catch(() => {}); qrScanner = null; }
-  scannerRunning = false;
-  resetScannerUI();
-}
-
-function resetScannerUI() {
+  if (scanAnimFrame) {
+    cancelAnimationFrame(scanAnimFrame);
+    scanAnimFrame = null;
+  }
+  if (scanStream) {
+    scanStream.getTracks().forEach(t => t.stop());
+    scanStream = null;
+  }
+  const video = document.getElementById("scanner-video");
+  if (video) video.srcObject = null;
+  document.getElementById("scanner-wrap").style.display = "none";
   document.getElementById("scanStartBtn").style.display = "inline-block";
   document.getElementById("scanStopBtn").style.display  = "none";
-  scannerRunning = false;
 }
 
 // ===========================
