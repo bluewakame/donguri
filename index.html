@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="どんぐり">
   <link rel="apple-touch-icon" href="icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -85,6 +86,47 @@
     </div>
   </div>
 
+  <!-- ========== ページ4: お店管理 ========== -->
+  <div id="page-shop" class="page">
+    <div class="container">
+      <h1>🏪 お店管理</h1>
+      <p class="shop-mgmt-desc">
+        加盟店を登録してQRコードを発行できます。<br>
+        <small>お客さんがQRを読み取るとどんぐりをもらえます</small>
+      </p>
+      <button class="add-shop-btn" onclick="openAddShopModal()">＋ お店を追加</button>
+      <div id="shop-list"></div>
+      <p id="shop-empty" class="shop-empty-msg" style="display:none;">
+        登録されたお店はありません。<br>「＋ お店を追加」から登録してください。
+      </p>
+    </div>
+  </div>
+
+  <!-- ========== お店追加モーダル ========== -->
+  <div id="addShopOverlay" class="overlay" style="display:none;" onclick="closeAddShopModal()"></div>
+  <div id="addShopModal" class="modal" style="display:none;">
+    <h2 id="addShopTitle">🏪 お店を追加</h2>
+    <div class="shop-form">
+      <label class="form-label">お店の名前</label>
+      <input type="text" id="shopNameInput" class="form-input" placeholder="例: カフェ くぬぎ" maxlength="30">
+      <label class="form-label">お店のID <small>（英数字・ハイフン）</small></label>
+      <input type="text" id="shopIdInput" class="form-input" placeholder="例: cafe-kunugi" maxlength="30">
+      <p id="shop-form-msg" class="shop-form-msg"></p>
+    </div>
+    <button onclick="saveShop()">保存</button>
+    <button class="cancel-btn" onclick="closeAddShopModal()">キャンセル</button>
+  </div>
+
+  <!-- ========== QRコード表示モーダル ========== -->
+  <div id="qrDisplayOverlay" class="overlay" style="display:none;" onclick="closeQrDisplay()"></div>
+  <div id="qrDisplayModal" class="modal" style="display:none;">
+    <h2 id="qrShopName">QRコード</h2>
+    <p id="qrShopId" class="qr-shop-id-text"></p>
+    <div id="qrCanvas" class="qr-canvas-wrap"></div>
+    <p class="qr-hint">このQRをお客さんに読み取ってもらおう</p>
+    <button onclick="closeQrDisplay()">閉じる</button>
+  </div>
+
   <!-- ========== 金どんぐりショップ モーダル ========== -->
   <div id="goldShopOverlay" class="overlay" style="display:none;" onclick="closeGoldShop()"></div>
   <div id="goldShop" class="modal" style="display:none;">
@@ -127,6 +169,10 @@
     <button class="nav-btn" id="nav-qr" onclick="showPage('qr')">
       <span class="nav-icon">📷</span>
       <span class="nav-label">QR</span>
+    </button>
+    <button class="nav-btn" id="nav-shop" onclick="showPage('shop')">
+      <span class="nav-icon">🏪</span>
+      <span class="nav-label">お店</span>
     </button>
   </nav>
 
