@@ -376,19 +376,11 @@ function spawnLeaf(lat, lng) {
   const icon = L.divIcon({ html: "🌿", className: "", iconSize: [30, 30] });
   const m = L.marker(
     [lat + (Math.random() - 0.5) * 0.001, lng + (Math.random() - 0.5) * 0.001],
-    { icon }
+    { icon, bubblingMouseEvents: false }
   ).addTo(map);
   m.on("click", async function (e) {
-    L.DomEvent.stop(e);
-    if (e.originalEvent) {
-      e.originalEvent.stopPropagation();
-      e.originalEvent.preventDefault();
-    }
-    // ゴーストクリックがナビボタンに届かないよう一時的に無効化
-    const nav = document.querySelector(".bottom-nav");
-    nav.style.pointerEvents = "none";
-    setTimeout(() => { nav.style.pointerEvents = ""; }, 500);
-
+    L.DomEvent.stopPropagation(e);
+    L.DomEvent.preventDefault(e);
     leaf++;
     document.getElementById("leafCount").textContent = leaf;
     map.removeLayer(m);
