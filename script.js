@@ -455,35 +455,20 @@ function spawnAcornOnMap(lat, lng) {
 // 店舗マーカーを地図上に配置
 let shopMarkers = [];
 
-function spawnShops(lat, lng) {
-  redrawShopsOnMap(lat, lng);
+function spawnShops() {
+  redrawShopsOnMap();
 }
 
-function redrawShopsOnMap(lat, lng) {
+function redrawShopsOnMap() {
   // 既存の店舗マーカーを除去
   shopMarkers.forEach(m => map.removeLayer(m));
   shopMarkers = [];
 
   const shopIcon = L.divIcon({ html: "🏪", className: "", iconSize: [32, 32] });
 
-  // 登録済みお店がある場合はその中心付近にランダム配置
-  const list = shops.length > 0 ? shops : [
-    { id: "cafe-kunugi",    name: "カフェ くぬぎ" },
-    { id: "zakka-momiji",   name: "雑貨店 もみじ" },
-    { id: "bakery-donguri", name: "ベーカリー どんぐり屋" },
-  ];
-
-  const offsets = [
-    [ 0.0012,  0.0008],
-    [-0.0008,  0.0015],
-    [ 0.0005, -0.0012],
-    [ 0.0018, -0.0005],
-    [-0.0015,  0.0010],
-  ];
-
-  list.forEach((s, i) => {
-    const off = offsets[i % offsets.length];
-    const m = L.marker([lat + off[0], lng + off[1]], { icon: shopIcon })
+  // 登録済みで座標があるお店のみマーカーを配置
+  shops.filter(s => s.lat != null && s.lng != null).forEach(s => {
+    const m = L.marker([s.lat, s.lng], { icon: shopIcon })
       .addTo(map)
       .bindPopup(`<b>${s.name}</b><br>🌰 QRコードでどんぐりゲット！`);
     shopMarkers.push(m);
@@ -691,6 +676,13 @@ function openAddShopModal() {
   document.getElementById("shopIdInput").value = "";
   document.getElementById("shopIdInput").disabled = false;
   document.getElementById("shop-form-msg").textContent = "";
+  const locMsg = document.getElementById("shop-location-msg");
+  if (playerMarker) {
+    const ll = playerMarker.getLatLng();
+    locMsg.textContent = `📍 現在地に配置されます（${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}）`;
+  } else {
+    locMsg.textContent = "⚠️ 現在地を取得してから登録してください";
+  }
   document.getElementById("addShopModal").style.display = "block";
   document.getElementById("addShopOverlay").style.display = "block";
   document.getElementById("shopNameInput").focus();
@@ -705,6 +697,12 @@ function openEditShopModal(shopId) {
   document.getElementById("shopIdInput").value = shop.id;
   document.getElementById("shopIdInput").disabled = true;
   document.getElementById("shop-form-msg").textContent = "";
+  const locMsg = document.getElementById("shop-location-msg");
+  if (shop.lat != null && shop.lng != null) {
+    locMsg.textContent = `📍 登録済み位置（${shop.lat.toFixed(5)}, ${shop.lng.toFixed(5)}）`;
+  } else {
+    locMsg.textContent = "⚠️ この店舗には位置情報がありません";
+  }
   document.getElementById("addShopModal").style.display = "block";
   document.getElementById("addShopOverlay").style.display = "block";
   document.getElementById("shopNameInput").focus();
@@ -731,7 +729,12 @@ function saveShop() {
       msg.textContent = "❌ このIDはすでに使われています";
       return;
     }
-    shops.push({ id, name, createdAt: Date.now() });
+    if (!playerMarker) {
+      msg.textContent = "❌ 現在地を取得してから登録してください";
+      return;
+    }
+    const latlng = playerMarker.getLatLng();
+    shops.push({ id, name, lat: latlng.lat, lng: latlng.lng, createdAt: Date.now() });
   } else {
     const shop = shops.find(s => s.id === editingShopId);
     if (shop) shop.name = name;
@@ -742,9 +745,8 @@ function saveShop() {
   closeAddShopModal();
 
   // 地図が初期化済みなら店舗マーカーを再描画
-  if (mapInitialized && playerMarker) {
-    const latlng = playerMarker.getLatLng();
-    redrawShopsOnMap(latlng.lat, latlng.lng);
+  if (mapInitialized) {
+    redrawShopsOnMap();
   }
 }
 
@@ -755,6 +757,9 @@ function deleteShop(shopId) {
   shops = shops.filter(s => s.id !== shopId);
   saveShopsToStorage();
   renderShopList();
+  if (mapInitialized) {
+    redrawShopsOnMap();
+  }
 }
 
 // QRコードの時間窓（5分 = 300秒）
