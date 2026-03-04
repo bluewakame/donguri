@@ -5,7 +5,6 @@
 const SUPABASE_URL = "https://qqibyplvoeatjuyklqnp.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaWJ5cGx2b2VhdGp1eWtscW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2Mjc2NTAsImV4cCI6MjA4ODIwMzY1MH0.a-pJtRp3UXHSlyGwPD8STIH86tvrfjxAow9_C6uVtU4";
 
-// Supabase REST API ヘルパー
 async function sbGet(userKey) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userKey)}&limit=1`,
@@ -47,17 +46,22 @@ const USER_KEY = getUserKey();
 // 状態変数
 // ===========================
 
-let count     = 0;
-let gold      = 0;
-let leaf      = 0;
-let boiled    = 0;
-let shieldEnd = 0;
+let count = 0;  // どんぐり
+let gold  = 0;  // 金どんぐり
+let leaf  = 0;  // 葉っぱ
 
-let previousTrees  = 0;
+let previousTrees    = 0;
 let map;
-let mapInitialized = false;
-let scanStream    = null;
-let scanAnimFrame = null;
+let mapInitialized   = false;
+let playerMarker     = null;
+let initialLocSet    = false;
+let lastSpawnLat     = null;
+let lastSpawnLng     = null;
+let scanStream       = null;
+let scanAnimFrame    = null;
+
+const SPAWN_DIST_M   = 30;    // 何m移動したら葉っぱ出現
+const SPAWN_RADIUS   = 0.001; // スポーン半径（約110m）
 
 // ===========================
 // 起動：Supabaseからデータ読み込み
@@ -68,69 +72,50 @@ async function initApp() {
 
   try {
     const row = await sbGet(USER_KEY);
-
     if (row) {
-      // 既存ユーザー：DBから復元
-      count     = row.acorn_count  || 0;
-      gold      = row.gold_count   || 0;
-      leaf      = row.leaf_count   || 0;
-      boiled    = row.boiled_count || 0;
-      shieldEnd = row.shield_end   || 0;
-      // 時間減衰をDBのlast_visitで計算
+      count = row.acorn_count || 0;
+      gold  = row.gold_count  || 0;
+      leaf  = row.leaf_count  || 0;
       applyTimeDecay(row.last_visit || 0);
     } else {
-      // 新規ユーザー：DBに初期レコード作成
       await sbUpsert(USER_KEY, {
-        acorn_count: 0, gold_count: 0, leaf_count: 0,
-        boiled_count: 0, last_visit: Date.now(), shield_end: 0
+        acorn_count: 0, gold_count: 0, leaf_count: 0, last_visit: Date.now()
       });
     }
   } catch (e) {
-    // オフライン時はlocalStorageにフォールバック
     console.warn("Supabase接続失敗、ローカルデータを使用:", e);
-    count     = parseInt(localStorage.getItem("acornCount"))  || 0;
-    gold      = parseInt(localStorage.getItem("goldCount"))   || 0;
-    leaf      = parseInt(localStorage.getItem("leafCount"))   || 0;
-    boiled    = parseInt(localStorage.getItem("boiledCount")) || 0;
-    shieldEnd = parseInt(localStorage.getItem("shieldEnd"))   || 0;
+    count = parseInt(localStorage.getItem("acornCount")) || 0;
+    gold  = parseInt(localStorage.getItem("goldCount"))  || 0;
+    leaf  = parseInt(localStorage.getItem("leafCount"))  || 0;
     applyTimeDecay(parseInt(localStorage.getItem("lastVisit")) || 0);
   }
 
-  previousTrees = Math.floor((count + boiled) / 10);
+  previousTrees = Math.floor(count / 10);
   refreshUI();
-  updateNextTree();
   updateForest();
-  checkShieldWarning();
   showMessage("");
 }
 
 // ===========================
-// DBへの保存（localStorageにも同時保存）
+// 保存（localStorage + Supabase）
 // ===========================
 
 async function saveData() {
   const now = Date.now();
+  localStorage.setItem("acornCount", count);
+  localStorage.setItem("goldCount",  gold);
+  localStorage.setItem("leafCount",  leaf);
+  localStorage.setItem("lastVisit",  now);
 
-  // localStorageにも保存（オフライン対策）
-  localStorage.setItem("acornCount",  count);
-  localStorage.setItem("goldCount",   gold);
-  localStorage.setItem("leafCount",   leaf);
-  localStorage.setItem("boiledCount", boiled);
-  localStorage.setItem("shieldEnd",   shieldEnd);
-  localStorage.setItem("lastVisit",   now);
-
-  // Supabaseに非同期保存
   try {
     await sbUpsert(USER_KEY, {
-      acorn_count:  count,
-      gold_count:   gold,
-      leaf_count:   leaf,
-      boiled_count: boiled,
-      shield_end:   shieldEnd,
-      last_visit:   now
+      acorn_count: count,
+      gold_count:  gold,
+      leaf_count:  leaf,
+      last_visit:  now
     });
   } catch (e) {
-    console.warn("保存失敗（次回起動時に同期されます）:", e);
+    console.warn("保存失敗（次回起動時に同期）:", e);
   }
 }
 
@@ -156,10 +141,9 @@ function showPage(name) {
 // ===========================
 
 function refreshUI() {
-  document.getElementById("count").textContent       = count;
-  document.getElementById("gold").textContent        = gold;
-  document.getElementById("leafCount").textContent   = leaf;
-  document.getElementById("boiledCount").textContent = boiled;
+  document.getElementById("count").textContent     = count;
+  document.getElementById("gold").textContent      = gold;
+  document.getElementById("leafCount").textContent = leaf;
 }
 
 function showMessage(text) {
@@ -171,82 +155,19 @@ function showQrMessage(text) {
 }
 
 // ===========================
-// どんぐりを拾う → QRページへ
-// ===========================
-
-function addAcorn() {
-  showPage("qr");
-}
-
-// ===========================
-// 🫕 ゆでる
-// ===========================
-
-async function boilAcorns() {
-  if (count <= 0) { showMessage("🌰 ゆでるどんぐりがない"); return; }
-  const n = count;
-  boiled += n;
-  count = 0;
-  refreshUI();
-  updateForest();
-  showMessage("🫕 " + n + "個ゆでた！毛虫から守られたよ");
-  document.getElementById("caterpillarWarning").style.display = "none";
-  document.getElementById("caterpillar").textContent = "";
-  await saveData();
-}
-
-// ===========================
-// 葉っぱ交換
+// 葉っぱ交換（🌿5 → 🌰1）
 // ===========================
 
 async function exchangeLeaf() {
-  if (leaf >= 5) {
-    leaf -= 5;
-    count += 1;
-    refreshUI();
-    updateForest();
-    showMessage("🌰 はっぱ5枚でどんぐりと交換！");
-    await saveData();
-  } else {
-    showMessage("🌿 はっぱが足りない（あと" + (5 - leaf) + "枚必要）");
+  if (leaf < 5) {
+    showMessage("🌿 葉っぱが足りない（あと " + (5 - leaf) + " 枚必要）");
+    return;
   }
-}
-
-// ===========================
-// 金どんぐりショップ
-// ===========================
-
-function openGoldShop() {
-  document.getElementById("goldInShop").textContent = gold;
-  document.getElementById("goldShop").style.display = "block";
-  document.getElementById("goldShopOverlay").style.display = "block";
-}
-
-function closeGoldShop() {
-  document.getElementById("goldShop").style.display = "none";
-  document.getElementById("goldShopOverlay").style.display = "none";
-}
-
-async function buyItem(type) {
-  if (type === "boost") {
-    if (gold < 1) { showMessage("✨ 金どんぐりが足りない"); closeGoldShop(); return; }
-    gold--; count += 5;
-    showMessage("⚡ どんぐりが5個増えた！");
-  } else if (type === "shield") {
-    if (gold < 3) { showMessage("✨ 金どんぐりが足りない（3個必要）"); closeGoldShop(); return; }
-    gold -= 3;
-    shieldEnd = Date.now() + 24 * 60 * 60 * 1000;
-    showMessage("🛡️ 毛虫バリア発動！24時間守るよ");
-    checkShieldWarning();
-  } else if (type === "leaf") {
-    if (gold < 2) { showMessage("✨ 金どんぐりが足りない（2個必要）"); closeGoldShop(); return; }
-    gold -= 2; leaf += 10;
-    showMessage("🌿 はっぱが10枚増えた！");
-  }
+  leaf  -= 5;
+  count += 1;
   refreshUI();
   updateForest();
-  document.getElementById("goldInShop").textContent = gold;
-  closeGoldShop();
+  showMessage("🌰 葉っぱ5枚をどんぐりと交換！");
   await saveData();
 }
 
@@ -254,9 +175,11 @@ async function buyItem(type) {
 // リセット
 // ===========================
 
-async function resetAcorn() {
+async function resetGame() {
   if (!confirm("本当にリセットしますか？")) return;
-  count = 0; gold = 0; boiled = 0;
+  count = 0;
+  gold  = 0;
+  leaf  = 0;
   refreshUI();
   updateForest();
   showMessage("");
@@ -264,32 +187,23 @@ async function resetAcorn() {
 }
 
 // ===========================
-// 時間減衰（毛虫）
+// 時間減衰（🐛 虫に食べられる）
 // ===========================
 
 function applyTimeDecay(lastVisitMs) {
-  if (!lastVisitMs) return;
-  if (Date.now() < shieldEnd) return;
+  if (!lastVisitMs || count <= 0) return;
+  const diff       = Date.now() - lastVisitMs;
+  const decayCount = Math.floor(diff / (60 * 60 * 1000)); // 1時間ごとに1個
+  if (decayCount <= 0) return;
 
-  const diff = Date.now() - lastVisitMs;
-  // 1時間ごとに1個
-  const decayCount = Math.floor(diff / (60 * 60 * 1000));
-
-  if (decayCount > 0 && count > 0) {
-    const eaten = Math.min(decayCount, count);
-    count = Math.max(0, count - eaten);
-    showMessage("🐛 " + eaten + "個食べられた！「ゆでる」で守れるよ");
-    document.getElementById("caterpillar").textContent = "🐛";
-    document.getElementById("caterpillarWarning").style.display = "block";
-  }
-}
-
-function checkShieldWarning() {
-  if (Date.now() < shieldEnd) {
-    const remaining = Math.ceil((shieldEnd - Date.now()) / (60 * 60 * 1000));
-    document.getElementById("caterpillarWarning").style.display = "none";
-    showMessage("🛡️ バリア有効中（残り約" + remaining + "時間）");
-  }
+  const eaten = Math.min(decayCount, count);
+  count = Math.max(0, count - eaten);
+  showMessage("🐛 " + eaten + " 個食べられた！");
+  document.getElementById("bugWarning").style.display = "block";
+  setTimeout(() => {
+    document.getElementById("bugWarning").style.display = "none";
+    showMessage("");
+  }, 6000);
 }
 
 // ===========================
@@ -297,20 +211,24 @@ function checkShieldWarning() {
 // ===========================
 
 function updateForest() {
-  const total = count + boiled;
-  const trees = Math.floor(total / 10);
+  const trees = Math.floor(count / 10);
   let display = "";
   for (let i = 0; i < trees; i++) display += "🌳";
-  document.getElementById("forest").textContent = display;
-  if (trees > previousTrees) showMessage("🌳 新しい木が育った！");
+  document.getElementById("forest").textContent = display || "　";
+
+  if (trees > previousTrees) {
+    showForestMessage("🌳 新しい木が育った！");
+  } else if (trees < previousTrees) {
+    showForestMessage("🐛 虫に食べられて木が減った...");
+  }
   previousTrees = trees;
+
   updateNextTree();
   updateForestLevel();
 }
 
 function updateNextTree() {
-  const total = count + boiled;
-  const rem  = total % 10;
+  const rem  = count % 10;
   const left = rem === 0 ? 10 : 10 - rem;
   const el   = document.getElementById("nextTree");
   el.textContent = left;
@@ -318,10 +236,17 @@ function updateNextTree() {
 }
 
 function updateForestLevel() {
-  const trees  = Math.floor((count + boiled) / 10);
+  const trees  = Math.floor(count / 10);
   const levels = ["まだ森はない", "🌱 小さな森", "🌿 若い森", "🌳 深い森"];
   const idx    = trees === 0 ? 0 : trees <= 3 ? 1 : trees <= 7 ? 2 : 3;
   document.getElementById("forestLevel").textContent = levels[idx];
+}
+
+function showForestMessage(text) {
+  const el = document.getElementById("forest-message");
+  el.textContent = text;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
 // ===========================
@@ -329,36 +254,71 @@ function updateForestLevel() {
 // ===========================
 
 function initMap() {
-  map = L.map("map").setView([35.6895, 139.6917], 13);
+  map = L.map("map").setView([35.6895, 139.6917], 15);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "© OpenStreetMap contributors"
   }).addTo(map);
   setTimeout(() => { map.invalidateSize(); }, 300);
 
   showMapMessage("📍 現在地を取得中...");
-  map.locate({ setView: true, maxZoom: 16, enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+  map.on("locationfound", onLocationFound);
+  map.on("locationerror", onLocationError);
 
-  let locationInitialized = false;
-  map.on("locationfound", function (e) {
-    showMapMessage("");
-    const lat = e.latitude, lng = e.longitude;
-    if (!locationInitialized) {
-      locationInitialized = true;
-      L.circle([lat, lng], { radius: e.accuracy / 2, color: "#4a90d9", fillOpacity: 0.1 }).addTo(map);
-      L.marker([lat, lng]).addTo(map).bindPopup("あなたの現在地").openPopup();
-      const shopIcon = L.divIcon({ html: "🏪", className: "", iconSize: [30, 30] });
-      L.marker([lat + 0.001, lng + 0.001], { icon: shopIcon }).addTo(map)
-        .bindPopup("【加盟店】どんぐりQRがあります 🌰");
-      for (let i = 0; i < 3; i++) spawnLeaf(lat, lng);
+  // 継続的な位置監視
+  map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+}
+
+function onLocationFound(e) {
+  showMapMessage("");
+  const lat = e.latitude;
+  const lng = e.longitude;
+
+  if (!playerMarker) {
+    // 初回取得: プレイヤーマーカー・葉っぱ・店舗を配置
+    const playerIcon = L.divIcon({ html: "🧍", className: "", iconSize: [30, 30] });
+    playerMarker = L.marker([lat, lng], { icon: playerIcon })
+      .addTo(map)
+      .bindPopup("あなたの現在地");
+
+    lastSpawnLat = lat;
+    lastSpawnLng = lng;
+
+    // 初期葉っぱを5枚スポーン
+    for (let i = 0; i < 5; i++) spawnLeaf(lat, lng);
+
+    // デモ店舗を配置
+    spawnShops(lat, lng);
+
+    if (!initialLocSet) {
+      initialLocSet = true;
+      map.setView([lat, lng], 17);
     }
-    map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 10000 });
-  });
-  map.on("locationerror", function (e) {
-    let msg = "📍 現在地を取得できませんでした";
-    if (e.code === 1) msg = "📍 位置情報の許可が必要です";
-    if (e.code === 3) msg = "📍 タイムアウトしました。再度お試しください";
-    showMapMessage(msg);
-  });
+  } else {
+    // 位置更新: プレイヤーマーカーを移動
+    playerMarker.setLatLng([lat, lng]);
+
+    // 移動距離チェック → 一定距離で葉っぱ出現
+    const dist = calcDistanceM(lat, lng, lastSpawnLat, lastSpawnLng);
+    if (dist >= SPAWN_DIST_M) {
+      lastSpawnLat = lat;
+      lastSpawnLng = lng;
+
+      const n = 2 + Math.floor(Math.random() * 2); // 2〜3枚
+      for (let i = 0; i < n; i++) spawnLeaf(lat, lng);
+
+      // 33%の確率でどんぐりもランダム出現（仕様書「ランダム取得」）
+      if (Math.random() < 0.33) spawnAcornOnMap(lat, lng);
+
+      showForestMessage("🌿 新しい葉っぱが出てきた！");
+    }
+  }
+}
+
+function onLocationError(e) {
+  let msg = "📍 現在地を取得できませんでした";
+  if (e.code === 1) msg = "📍 位置情報の許可が必要です";
+  if (e.code === 3) msg = "📍 タイムアウト。再度お試しください";
+  showMapMessage(msg);
 }
 
 function showMapMessage(text) {
@@ -372,35 +332,71 @@ function showMapMessage(text) {
   el.textContent = text;
 }
 
+// 葉っぱをスポーン
 function spawnLeaf(lat, lng) {
   const icon = L.divIcon({ html: "🌿", className: "", iconSize: [30, 30] });
   const m = L.marker(
-    [lat + (Math.random() - 0.5) * 0.001, lng + (Math.random() - 0.5) * 0.001],
+    [lat + (Math.random() - 0.5) * SPAWN_RADIUS * 2,
+     lng + (Math.random() - 0.5) * SPAWN_RADIUS * 2],
     { icon, bubblingMouseEvents: false }
   ).addTo(map);
   m.on("click", async function (e) {
     L.DomEvent.stopPropagation(e);
-    L.DomEvent.preventDefault(e);
     leaf++;
-    document.getElementById("leafCount").textContent = leaf;
     map.removeLayer(m);
-    showForestMessage("🌿 はっぱをゲット！（合計 " + leaf + " 枚）");
+    document.getElementById("leafCount").textContent = leaf;
+    showForestMessage("🌿 葉っぱをゲット！（合計 " + leaf + " 枚）");
     await saveData();
   });
 }
 
-function showForestMessage(text) {
-  const el = document.getElementById("forest-message");
-  el.textContent = text;
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.textContent = ""; }, 3000);
+// どんぐりをランダムスポーン（ランダム取得）
+function spawnAcornOnMap(lat, lng) {
+  const icon = L.divIcon({ html: "🌰", className: "", iconSize: [30, 30] });
+  const m = L.marker(
+    [lat + (Math.random() - 0.5) * SPAWN_RADIUS * 2,
+     lng + (Math.random() - 0.5) * SPAWN_RADIUS * 2],
+    { icon, bubblingMouseEvents: false }
+  ).addTo(map);
+  m.on("click", async function (e) {
+    L.DomEvent.stopPropagation(e);
+    count++;
+    map.removeLayer(m);
+    document.getElementById("count").textContent = count;
+    updateForest();
+    showForestMessage("🌰 どんぐりをゲット！");
+    await saveData();
+  });
+}
+
+// デモ店舗マーカーを配置
+function spawnShops(lat, lng) {
+  const shops = [
+    { offset: [0.0012,  0.0008], name: "カフェ くぬぎ" },
+    { offset: [-0.0008, 0.0015], name: "雑貨店 もみじ" },
+    { offset: [0.0005, -0.0012], name: "ベーカリー どんぐり屋" },
+  ];
+  const shopIcon = L.divIcon({ html: "🏪", className: "", iconSize: [32, 32] });
+  shops.forEach(s => {
+    L.marker([lat + s.offset[0], lng + s.offset[1]], { icon: shopIcon })
+      .addTo(map)
+      .bindPopup(`<b>${s.name}</b><br>🌰 QRコードでどんぐりゲット！`);
+  });
+}
+
+// 2点間の距離（メートル）
+function calcDistanceM(lat1, lng1, lat2, lng2) {
+  const R    = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a    = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // ===========================
-// QRスキャナー（ネイティブ実装）
+// QRスキャナー
 // ===========================
-
-const VALID_QR_PREFIX = "DONGURI_SHOP_";
 
 async function startScanner() {
   showQrMessage("📷 カメラを起動中...");
@@ -461,23 +457,38 @@ function scanTick(video, canvas, ctx) {
 
 async function handleQrResult(text) {
   stopScanner();
-  if (text.startsWith(VALID_QR_PREFIX)) {
-    const shopName  = text.replace(VALID_QR_PREFIX, "").replace("_PREMIUM", "") || "加盟店";
-    const isPremium = text.includes("_PREMIUM");
-    count++;
-    if (isPremium && Math.random() < 0.10) {
-      gold++;
-      document.getElementById("gold").textContent = gold;
-      showQrMessage("✨ 【" + shopName + "】で金どんぐりもゲット！");
-    } else {
-      showQrMessage("🌰 【" + shopName + "】でどんぐりをゲット！");
-    }
-    document.getElementById("count").textContent = count;
-    updateForest();
-    await saveData();
-  } else {
+
+  // QRフォーマット: "donguri:店舗ID"
+  if (!text.startsWith("donguri:")) {
     showQrMessage("❌ このQRは加盟店のものではありません");
+    return;
   }
+
+  const shopId  = text.slice("donguri:".length);
+  const today   = new Date().toISOString().slice(0, 10);
+  const scanKey = "qr_scan_" + shopId;
+
+  // 1店舗1日1回制限
+  if (localStorage.getItem(scanKey) === today) {
+    showQrMessage("⏰ 【" + shopId + "】は今日すでに訪問済みです（1日1回）");
+    return;
+  }
+
+  localStorage.setItem(scanKey, today);
+  count++;
+
+  // 5%の確率で金どんぐり
+  if (Math.random() < 0.05) {
+    gold++;
+    document.getElementById("gold").textContent = gold;
+    showQrMessage("✨🌰 【" + shopId + "】で金どんぐりをゲット！");
+  } else {
+    showQrMessage("🌰 【" + shopId + "】でどんぐりをゲット！");
+  }
+
+  document.getElementById("count").textContent = count;
+  updateForest();
+  await saveData();
 }
 
 function stopScanner() {
