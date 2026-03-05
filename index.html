@@ -41,6 +41,11 @@
         </div>
       </div>
 
+      <p id="forestLevel"></p>
+      <p class="forest-display"><span id="forest"></span></p>
+      <p>次の木まであと <span id="nextTree"></span> 個</p>
+      <p id="forest-message"></p>
+
       <p id="message"></p>
       <p id="caterpillar"></p>
 
@@ -55,14 +60,10 @@
     </div>
   </div>
 
-  <!-- ========== ページ2: 森（地図） ========== -->
+  <!-- ========== ページ2: 地図探索 ========== -->
   <div id="page-forest" class="page">
     <div class="container">
-      <h1>🌳 森</h1>
-      <p id="forestLevel"></p>
-      <p class="forest-display"><span id="forest"></span></p>
-      <p>次の木まであと <span id="nextTree"></span> 個</p>
-      <p id="forest-message"></p>
+      <h1>🗺️ 地図探索</h1>
       <div id="map"></div>
     </div>
   </div>
@@ -196,8 +197,8 @@
       <span class="nav-label">どんぐり</span>
     </button>
     <button class="nav-btn" id="nav-forest" onclick="showPage('forest')">
-      <span class="nav-icon">🌳</span>
-      <span class="nav-label">森</span>
+      <span class="nav-icon">🗺️</span>
+      <span class="nav-label">地図</span>
     </button>
     <button class="nav-btn" id="nav-qr" onclick="showPage('qr')">
       <span class="nav-icon">📷</span>
