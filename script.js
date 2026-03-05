@@ -285,23 +285,6 @@ async function exchangeLeaf() {
 }
 
 // ===========================
-// リセット
-// ===========================
-
-async function resetGame() {
-  if (!confirm("本当にリセットしますか？")) return;
-  count     = 0;
-  gold      = 0;
-  leaf      = 0;
-  boiled    = 0;
-  shieldEnd = 0;
-  refreshUI();
-  updateForest();
-  showMessage("");
-  await saveData();
-}
-
-// ===========================
 // 🫕 ゆでる
 // ===========================
 
