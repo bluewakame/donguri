@@ -34,6 +34,14 @@ async function sbUpsert(userKey, fields) {
   });
 }
 
+async function sbDelete(userKey) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userKey)}`,
+    { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }
+  );
+  if (!res.ok) throw new Error("削除に失敗しました");
+}
+
 // ===========================
 // ユーザーキー（端末固有ID）
 // ===========================
@@ -99,7 +107,9 @@ function logEvent(type, data) {
     log.push(Object.assign({ type, ts: Date.now() }, data || {}));
     if (log.length > 500) log.splice(0, log.length - 500);
     localStorage.setItem("eventLog", JSON.stringify(log));
-  } catch (_) {}
+  } catch (e) {
+    console.warn("ログの保存に失敗:", e);
+  }
 }
 
 // ===========================
@@ -711,8 +721,8 @@ function stopScanner() {
 // 認証（お店管理用）
 // ===========================
 
-let shopOwnerToken = localStorage.getItem("shopOwnerToken") || null;
-let shopOwnerEmail = localStorage.getItem("shopOwnerEmail") || null;
+let shopOwnerToken = sessionStorage.getItem("shopOwnerToken") || null;
+let shopOwnerEmail = sessionStorage.getItem("shopOwnerEmail") || null;
 
 async function sbSignIn(email, password) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -788,8 +798,8 @@ async function submitAuth() {
       if (data.access_token) {
         shopOwnerToken = data.access_token;
         shopOwnerEmail = email;
-        localStorage.setItem("shopOwnerToken", shopOwnerToken);
-        localStorage.setItem("shopOwnerEmail", shopOwnerEmail);
+        sessionStorage.setItem("shopOwnerToken", shopOwnerToken);
+        sessionStorage.setItem("shopOwnerEmail", shopOwnerEmail);
         closeAuthModal();
         renderShopOwnerUI();
       } else {
@@ -800,8 +810,8 @@ async function submitAuth() {
       const data = await sbSignIn(email, password);
       shopOwnerToken = data.access_token;
       shopOwnerEmail = email;
-      localStorage.setItem("shopOwnerToken", shopOwnerToken);
-      localStorage.setItem("shopOwnerEmail", shopOwnerEmail);
+      sessionStorage.setItem("shopOwnerToken", shopOwnerToken);
+      sessionStorage.setItem("shopOwnerEmail", shopOwnerEmail);
       closeAuthModal();
       renderShopOwnerUI();
     }
@@ -815,8 +825,8 @@ function signOut() {
   if (!confirm("ログアウトしますか？")) return;
   shopOwnerToken = null;
   shopOwnerEmail = null;
-  localStorage.removeItem("shopOwnerToken");
-  localStorage.removeItem("shopOwnerEmail");
+  sessionStorage.removeItem("shopOwnerToken");
+  sessionStorage.removeItem("shopOwnerEmail");
   renderShopOwnerUI();
 }
 
@@ -1089,6 +1099,54 @@ function closeQrDisplay() {
     qrCountdownTimer = null;
   }
   qrRefreshShopId = null;
+}
+
+// ===========================
+// プライバシーポリシー
+// ===========================
+
+function openPrivacyModal() {
+  document.getElementById("privacyModal").style.display = "block";
+  document.getElementById("privacyOverlay").style.display = "block";
+}
+
+function closePrivacyModal() {
+  document.getElementById("privacyModal").style.display = "none";
+  document.getElementById("privacyOverlay").style.display = "none";
+}
+
+// ===========================
+// データ削除
+// ===========================
+
+async function deleteUserData() {
+  if (!confirm(
+    "すべてのデータ（どんぐり・金どんぐり・ゆで済みなど）を完全に削除しますか？\n" +
+    "この操作は取り消せません。"
+  )) return;
+
+  showMessage("🗑️ データを削除中...");
+
+  try {
+    await sbDelete(USER_KEY);
+  } catch (e) {
+    console.warn("Supabaseからの削除に失敗（ローカルデータは削除します）:", e);
+  }
+
+  // ローカルデータを全消去
+  const keysToRemove = [
+    "userKey", "acornCount", "goldCount", "leafCount", "boiledCount",
+    "shieldEnd", "lastVisit", "locationConsent", "eventLog", "managedShops"
+  ];
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // QRスキャン記録も消去
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("qr_scan_"))
+    .forEach(k => localStorage.removeItem(k));
+
+  showMessage("✅ データを削除しました。ページを再読み込みします...");
+  setTimeout(() => location.reload(), 2000);
 }
 
 // ===========================
