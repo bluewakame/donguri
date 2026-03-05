@@ -447,7 +447,7 @@ function onLocationFound(e) {
 
   if (!playerMarker) {
     // 初回取得: プレイヤーマーカー・葉っぱ・店舗を配置
-    const playerIcon = L.divIcon({ html: "🧍", className: "", iconSize: [30, 30] });
+    const playerIcon = L.divIcon({ html: '<span style="font-size:40px">🧍</span>', className: "", iconSize: [44, 44] });
     playerMarker = L.marker([lat, lng], { icon: playerIcon })
       .addTo(map)
       .bindPopup("あなたの現在地");
@@ -544,7 +544,7 @@ function startGeolocation() {
 
 // 葉っぱをスポーン
 function spawnLeaf(lat, lng) {
-  const icon = L.divIcon({ html: "🌿", className: "", iconSize: [30, 30] });
+  const icon = L.divIcon({ html: '<span style="font-size:40px">🌿</span>', className: "", iconSize: [44, 44] });
   const m = L.marker(
     [lat + (Math.random() - 0.5) * SPAWN_RADIUS * 2,
      lng + (Math.random() - 0.5) * SPAWN_RADIUS * 2],
@@ -574,7 +574,7 @@ function redrawShopsOnMap() {
   shopMarkers.forEach(m => map.removeLayer(m));
   shopMarkers = [];
 
-  const shopIcon = L.divIcon({ html: "🌰", className: "", iconSize: [32, 32] });
+  const shopIcon = L.divIcon({ html: '<span style="font-size:40px">🌰</span>', className: "", iconSize: [44, 44] });
 
   // 登録済みで座標があるお店のみマーカーを配置
   shops.filter(s => s.lat != null && s.lng != null).forEach(s => {
