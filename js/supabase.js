@@ -142,6 +142,57 @@ async function sbLogVisit(shopId, rewardType, latLng) {
   }
 }
 
+// ===========================
+// お店 CRUD（Supabase 同期）
+// ===========================
+
+/**
+ * お店情報を Supabase に保存（追加・更新）する。
+ * shopOwnerToken が必要（RLS: owner_id = auth.uid()）。
+ */
+async function sbSaveShop(shop) {
+  let ownerId = null;
+  try { ownerId = JSON.parse(atob(shopOwnerToken.split(".")[1])).sub; } catch (_) {}
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/shops`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: "Bearer " + shopOwnerToken,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify({ id: shop.id, name: shop.name, lat: shop.lat, lng: shop.lng, owner_id: ownerId }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error("お店の保存に失敗しました: " + err);
+  }
+}
+
+/**
+ * お店を Supabase から削除する。
+ * shopOwnerToken が必要（RLS: owner_id = auth.uid()）。
+ */
+async function sbDeleteShop(shopId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/shops?id=eq.${encodeURIComponent(shopId)}`,
+    { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + shopOwnerToken } }
+  );
+  if (!res.ok) throw new Error("お店の削除に失敗しました");
+}
+
+/**
+ * Supabase から全お店を取得する（全プレイヤー向け）。
+ */
+async function sbLoadShops() {
+  const token = authToken || SUPABASE_KEY;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/shops?select=id,name,lat,lng`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + token },
+  });
+  if (!res.ok) throw new Error("お店の取得に失敗しました");
+  return await res.json();
+}
+
 /**
  * 店舗の来客統計を取得する。
  * 今日・昨日・累計と昨日比トレンドを返す。

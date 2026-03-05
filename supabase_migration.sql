@@ -63,6 +63,42 @@ create policy "anyone can read visit_logs"
   using (true);
 
 -- ===========================
+-- shops テーブル（お店登録・全プレイヤーへの公開）
+-- ===========================
+
+create table if not exists shops (
+  id         text primary key,
+  name       text not null,
+  lat        double precision not null,
+  lng        double precision not null,
+  owner_id   uuid references auth.users(id),
+  created_at timestamptz default now()
+);
+
+-- RLS 有効化
+alter table shops enable row level security;
+
+-- 誰でも読み取り可（マップ表示用）
+create policy "anyone can read shops"
+  on shops for select
+  using (true);
+
+-- オーナーのみ追加可
+create policy "shop owners can insert"
+  on shops for insert
+  with check (auth.uid() = owner_id);
+
+-- オーナーのみ更新可
+create policy "shop owners can update"
+  on shops for update
+  using (auth.uid() = owner_id);
+
+-- オーナーのみ削除可
+create policy "shop owners can delete"
+  on shops for delete
+  using (auth.uid() = owner_id);
+
+-- ===========================
 -- APIレート制限補助（訪問記録の急増を検知するためのView）
 -- ===========================
 create or replace view visit_logs_daily_summary as
