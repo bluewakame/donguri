@@ -57,6 +57,20 @@ const TUTORIAL_STEPS = [
     `,
   },
   {
+    emoji: "🏪",
+    title: "お店を登録して管理しよう",
+    body: `
+      <p>「お店」タブでは、<strong>加盟店オーナーとしてお店を登録・管理</strong>できます。</p>
+      <div class="tutorial-items">
+        <div class="tutorial-item">📝 <span>アカウント登録／ログイン</span></div>
+        <div class="tutorial-item">🏪 <span>お店を追加（名前・ID・位置を設定）</span></div>
+        <div class="tutorial-item">📷 <span>QRコードを表示してお客さんにスキャンしてもらう</span></div>
+        <div class="tutorial-item">📊 <span>来店数を確認（今日・昨日・累計）</span></div>
+      </div>
+      <p class="tutorial-note">🔄 QRコードは30秒ごとに自動更新され、不正スキャンを防ぎます</p>
+    `,
+  },
+  {
     emoji: "🐛",
     title: "毛虫に気をつけて！",
     body: `
