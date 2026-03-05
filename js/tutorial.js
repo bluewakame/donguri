@@ -93,7 +93,6 @@ function showTutorial() {
 function closeTutorial() {
   document.getElementById("tutorialOverlay").style.display = "none";
   document.getElementById("tutorialModal").style.display = "none";
-  localStorage.setItem("tutorialDone", "1");
 }
 
 function renderTutorialStep(index) {
@@ -130,8 +129,10 @@ function renderTutorialStep(index) {
     `${index + 1} / ${total}`;
 }
 
-function initTutorial() {
-  if (!localStorage.getItem("tutorialDone")) {
+// hasItems: initApp() のデータ読み込み後に呼ばれる
+// アイテムを1つも持っていない場合のみ表示する
+function initTutorial(hasItems) {
+  if (!hasItems) {
     showTutorial();
   }
 }

@@ -88,6 +88,9 @@ async function initApp() {
   updateForest();
   checkShieldWarning();
   showMessage("");
+
+  // アイテムを1つも持っていない場合のみチュートリアルを表示
+  initTutorial(count + gold + leaf + boiled > 0);
 }
 
 // ===========================
