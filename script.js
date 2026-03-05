@@ -15,8 +15,8 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // 匿名認証（ゲームユーザー）
 // ===========================
 
-let authToken  = localStorage.getItem("authToken")  || null;
-let authUserId = localStorage.getItem("authUserId") || null;
+let authToken  = localStorage.getItem("authToken");
+let authUserId = localStorage.getItem("authUserId");
 
 function isTokenExpired(token) {
   try {
@@ -51,8 +51,8 @@ async function refreshAuthToken() {
 }
 
 async function ensureAuth() {
-  if (authToken && authUserId && !isTokenExpired(authToken)) return;
-  if (authToken && authUserId && isTokenExpired(authToken)) {
+  if (authToken && authUserId) {
+    if (!isTokenExpired(authToken)) return;
     await refreshAuthToken();
     if (authToken && authUserId) return;
   }
@@ -210,6 +210,7 @@ async function saveData() {
   localStorage.setItem("lastVisit",   now);
 
   try {
+    await ensureAuth();
     await sbUpsert(authUserId, {
       acorn_count:  count,
       gold_count:   gold,
@@ -1173,6 +1174,7 @@ async function deleteUserData() {
   showMessage("🗑️ データを削除中...");
 
   try {
+    await ensureAuth();
     await sbDelete(authUserId);
   } catch (e) {
     console.warn("Supabaseからの削除に失敗（ローカルデータは削除します）:", e);
