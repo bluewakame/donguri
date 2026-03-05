@@ -12,7 +12,7 @@ body {
   background-color: #f4f8f2;
   font-family: sans-serif;
   text-align: center;
-  padding-bottom: 72px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
 .container {
@@ -241,7 +241,8 @@ button:active { background-color: #5e7a52; }
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   background: white;
   border-top: 1px solid #e0e0e0;
   display: flex;
