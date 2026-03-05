@@ -121,11 +121,13 @@ let playerMarker     = null;
 let initialLocSet    = false;
 let lastSpawnLat     = null;
 let lastSpawnLng     = null;
+let lastSpawnTime    = 0;     // 最後に葉っぱをスポーンした時刻（ms）
 let scanStream       = null;
 let scanAnimFrame    = null;
 
-const SPAWN_DIST_M   = 30;    // 何m移動したら葉っぱ出現
-const SPAWN_RADIUS   = 0.001; // スポーン半径（約110m）
+const SPAWN_DIST_M      = 30;    // 何m移動したら葉っぱ出現
+const SPAWN_RADIUS      = 0.001; // スポーン半径（約110m）
+const SPAWN_INTERVAL_MS = 60000; // 葉っぱスポーンの最小間隔（60秒）
 
 // ===========================
 // レートリミット（連打防止）
@@ -452,6 +454,7 @@ function onLocationFound(e) {
 
     lastSpawnLat = lat;
     lastSpawnLng = lng;
+    lastSpawnTime = Date.now();
 
     // 初期葉っぱを5枚スポーン
     for (let i = 0; i < 5; i++) spawnLeaf(lat, lng);
@@ -467,17 +470,16 @@ function onLocationFound(e) {
     // 位置更新: プレイヤーマーカーを移動
     playerMarker.setLatLng([lat, lng]);
 
-    // 移動距離チェック → 一定距離で葉っぱ出現
+    // 移動距離チェック → 一定距離かつ一定時間経過で葉っぱ出現
     const dist = calcDistanceM(lat, lng, lastSpawnLat, lastSpawnLng);
-    if (dist >= SPAWN_DIST_M) {
+    const now = Date.now();
+    if (dist >= SPAWN_DIST_M && now - lastSpawnTime >= SPAWN_INTERVAL_MS) {
       lastSpawnLat = lat;
       lastSpawnLng = lng;
+      lastSpawnTime = now;
 
       const n = 2 + Math.floor(Math.random() * 2); // 2〜3枚
       for (let i = 0; i < n; i++) spawnLeaf(lat, lng);
-
-      // 33%の確率でどんぐりもランダム出現（仕様書「ランダム取得」）
-      if (Math.random() < 0.33) spawnAcornOnMap(lat, lng);
 
       logEvent("movement_spawn", { lat, lng });
       showForestMessage("🌿 新しい葉っぱが出てきた！");
@@ -556,27 +558,6 @@ function spawnLeaf(lat, lng) {
     document.getElementById("leafCount").textContent = leaf;
     showForestMessage("🌿 葉っぱをゲット！（合計 " + leaf + " 枚）");
     logEvent("leaf_collected", { lat: pos.lat, lng: pos.lng });
-    await saveData();
-  });
-}
-
-// どんぐりをランダムスポーン（ランダム取得）
-function spawnAcornOnMap(lat, lng) {
-  const icon = L.divIcon({ html: "🌰", className: "", iconSize: [30, 30] });
-  const m = L.marker(
-    [lat + (Math.random() - 0.5) * SPAWN_RADIUS * 2,
-     lng + (Math.random() - 0.5) * SPAWN_RADIUS * 2],
-    { icon, bubblingMouseEvents: false }
-  ).addTo(map);
-  m.on("click", async function (e) {
-    L.DomEvent.stopPropagation(e);
-    const pos = m.getLatLng();
-    count++;
-    map.removeLayer(m);
-    document.getElementById("count").textContent = count;
-    updateForest();
-    showForestMessage("🌰 どんぐりをゲット！");
-    logEvent("acorn_collected_map", { lat: pos.lat, lng: pos.lng });
     await saveData();
   });
 }
