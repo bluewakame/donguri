@@ -228,9 +228,22 @@ async function initApp() {
       shieldEnd = row.shield_end   || 0;
       applyTimeDecay(row.last_visit || 0);
     } else {
+      // Supabaseにデータがない場合（新規ユーザーまたはセッション期限切れ）
+      // まずlocalStorageから既存データを復元し、Supabaseに移行する
+      count     = parseInt(localStorage.getItem("acornCount"))  || 0;
+      gold      = parseInt(localStorage.getItem("goldCount"))   || 0;
+      leaf      = parseInt(localStorage.getItem("leafCount"))   || 0;
+      boiled    = parseInt(localStorage.getItem("boiledCount")) || 0;
+      shieldEnd = parseInt(localStorage.getItem("shieldEnd"))   || 0;
+      const localLastVisit = parseInt(localStorage.getItem("lastVisit")) || 0;
+      applyTimeDecay(localLastVisit);
       await sbUpsert(authUserId, {
-        acorn_count: 0, gold_count: 0, leaf_count: 0,
-        boiled_count: 0, shield_end: 0, last_visit: Date.now()
+        acorn_count:  count,
+        gold_count:   gold,
+        leaf_count:   leaf,
+        boiled_count: boiled,
+        shield_end:   shieldEnd,
+        last_visit:   localLastVisit || Date.now()
       });
     }
   } catch (e) {
