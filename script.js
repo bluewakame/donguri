@@ -1,6 +1,13 @@
 // ===========================
 // Supabase 設定
 // ===========================
+//
+// ⚠️  セキュリティ注意:
+//   SUPABASE_KEY は Supabase の anonymous (公開) キーです。
+//   フロントエンドから利用することを想定した設計ですが、
+//   Supabase ダッシュボードで Row Level Security (RLS) を
+//   有効化し、適切なポリシーを設定することで不正アクセスを防いでください。
+//   参考: https://supabase.com/docs/guides/auth/row-level-security
 
 const SUPABASE_URL = "https://qqibyplvoeatjuyklqnp.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaWJ5cGx2b2VhdGp1eWtscW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2Mjc2NTAsImV4cCI6MjA4ODIwMzY1MH0.a-pJtRp3UXHSlyGwPD8STIH86tvrfjxAow9_C6uVtU4";
@@ -67,6 +74,33 @@ let scanAnimFrame    = null;
 
 const SPAWN_DIST_M   = 30;    // 何m移動したら葉っぱ出現
 const SPAWN_RADIUS   = 0.001; // スポーン半径（約110m）
+
+// ===========================
+// レートリミット（連打防止）
+// ===========================
+
+const ACTION_COOLDOWN_MS = 800;
+const _actionTimestamps  = {};
+
+function isOnCooldown(action) {
+  const now = Date.now();
+  if (_actionTimestamps[action] && now - _actionTimestamps[action] < ACTION_COOLDOWN_MS) return true;
+  _actionTimestamps[action] = now;
+  return false;
+}
+
+// ===========================
+// 行動ログ（社会実験データ収集）
+// ===========================
+
+function logEvent(type, data) {
+  try {
+    const log = JSON.parse(localStorage.getItem("eventLog") || "[]");
+    log.push(Object.assign({ type, ts: Date.now() }, data || {}));
+    if (log.length > 500) log.splice(0, log.length - 500);
+    localStorage.setItem("eventLog", JSON.stringify(log));
+  } catch (_) {}
+}
 
 // ===========================
 // 起動：Supabaseからデータ読み込み
@@ -140,9 +174,14 @@ async function saveData() {
 
 function showPage(name) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => {
+    b.classList.remove("active");
+    b.removeAttribute("aria-current");
+  });
   document.getElementById("page-" + name).classList.add("active");
-  document.getElementById("nav-" + name).classList.add("active");
+  const navBtn = document.getElementById("nav-" + name);
+  navBtn.classList.add("active");
+  navBtn.setAttribute("aria-current", "page");
 
   if (name === "forest" && !mapInitialized) {
     mapInitialized = true;
@@ -175,6 +214,7 @@ function showQrMessage(text) {
 // ===========================
 
 async function exchangeLeaf() {
+  if (isOnCooldown("exchangeLeaf")) return;
   if (leaf < 5) {
     showMessage("🌿 葉っぱが足りない（あと " + (5 - leaf) + " 枚必要）");
     return;
@@ -184,6 +224,7 @@ async function exchangeLeaf() {
   refreshUI();
   updateForest();
   showMessage("🌰 葉っぱ5枚をどんぐりと交換！");
+  logEvent("leaf_exchanged", { leaf_after: leaf, acorn_after: count });
   await saveData();
 }
 
@@ -209,6 +250,7 @@ async function resetGame() {
 // ===========================
 
 async function boilAcorns() {
+  if (isOnCooldown("boilAcorns")) return;
   if (count <= 0) { showMessage("🌰 ゆでるどんぐりがない"); return; }
   const n = count;
   boiled += n;
@@ -218,6 +260,7 @@ async function boilAcorns() {
   showMessage("🫕 " + n + "個ゆでた！毛虫から守られたよ");
   document.getElementById("caterpillarWarning").style.display = "none";
   document.getElementById("caterpillar").textContent = "";
+  logEvent("acorns_boiled", { count: n });
   await saveData();
 }
 
@@ -237,6 +280,7 @@ function closeGoldShop() {
 }
 
 async function buyItem(type) {
+  if (isOnCooldown("buyItem")) return;
   if (type === "boost") {
     if (gold < 1) { showMessage("✨ 金どんぐりが足りない"); closeGoldShop(); return; }
     gold--; count += 5;
@@ -256,6 +300,7 @@ async function buyItem(type) {
   updateForest();
   document.getElementById("goldInShop").textContent = gold;
   closeGoldShop();
+  logEvent("item_purchased", { type });
   await saveData();
 }
 
@@ -326,10 +371,13 @@ function updateForestLevel() {
 }
 
 function showForestMessage(text) {
-  const el = document.getElementById("forest-message");
-  el.textContent = text;
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.textContent = ""; }, 3000);
+  ["forest-message", "map-forest-message"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.textContent = ""; }, 3000);
+  });
 }
 
 // ===========================
@@ -347,8 +395,8 @@ function initMap() {
   map.on("locationfound", onLocationFound);
   map.on("locationerror", onLocationError);
 
-  // 継続的な位置監視
-  map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+  // 位置情報同意確認後に監視開始
+  checkLocationConsent();
 }
 
 function onLocationFound(e) {
@@ -392,6 +440,7 @@ function onLocationFound(e) {
       // 33%の確率でどんぐりもランダム出現（仕様書「ランダム取得」）
       if (Math.random() < 0.33) spawnAcornOnMap(lat, lng);
 
+      logEvent("movement_spawn", { lat, lng });
       showForestMessage("🌿 新しい葉っぱが出てきた！");
     }
   }
@@ -415,6 +464,43 @@ function showMapMessage(text) {
   el.textContent = text;
 }
 
+// ===========================
+// 位置情報同意
+// ===========================
+
+function checkLocationConsent() {
+  const consent = localStorage.getItem("locationConsent");
+  if (consent === "granted") {
+    startGeolocation();
+  } else if (consent === "denied") {
+    showMapMessage("📍 位置情報の利用が許可されていません");
+    document.getElementById("locationAllowBtn").style.display = "block";
+  } else {
+    document.getElementById("locationConsentModal").style.display = "block";
+    document.getElementById("locationConsentOverlay").style.display = "block";
+  }
+}
+
+function acceptLocationConsent() {
+  localStorage.setItem("locationConsent", "granted");
+  document.getElementById("locationConsentModal").style.display = "none";
+  document.getElementById("locationConsentOverlay").style.display = "none";
+  document.getElementById("locationAllowBtn").style.display = "none";
+  startGeolocation();
+}
+
+function declineLocationConsent() {
+  localStorage.setItem("locationConsent", "denied");
+  document.getElementById("locationConsentModal").style.display = "none";
+  document.getElementById("locationConsentOverlay").style.display = "none";
+  showMapMessage("📍 位置情報の利用が許可されていません");
+  document.getElementById("locationAllowBtn").style.display = "block";
+}
+
+function startGeolocation() {
+  map.locate({ watch: true, enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+}
+
 // 葉っぱをスポーン
 function spawnLeaf(lat, lng) {
   const icon = L.divIcon({ html: "🌿", className: "", iconSize: [30, 30] });
@@ -425,10 +511,12 @@ function spawnLeaf(lat, lng) {
   ).addTo(map);
   m.on("click", async function (e) {
     L.DomEvent.stopPropagation(e);
+    const pos = m.getLatLng();
     leaf++;
     map.removeLayer(m);
     document.getElementById("leafCount").textContent = leaf;
     showForestMessage("🌿 葉っぱをゲット！（合計 " + leaf + " 枚）");
+    logEvent("leaf_collected", { lat: pos.lat, lng: pos.lng });
     await saveData();
   });
 }
@@ -443,11 +531,13 @@ function spawnAcornOnMap(lat, lng) {
   ).addTo(map);
   m.on("click", async function (e) {
     L.DomEvent.stopPropagation(e);
+    const pos = m.getLatLng();
     count++;
     map.removeLayer(m);
     document.getElementById("count").textContent = count;
     updateForest();
     showForestMessage("🌰 どんぐりをゲット！");
+    logEvent("acorn_collected_map", { lat: pos.lat, lng: pos.lng });
     await saveData();
   });
 }
@@ -590,8 +680,10 @@ async function handleQrResult(text) {
     gold++;
     document.getElementById("gold").textContent = gold;
     showQrMessage("✨🌰 【" + shopId + "】で金どんぐりをゲット！");
+    logEvent("gold_acorn_qr", { shopId });
   } else {
     showQrMessage("🌰 【" + shopId + "】でどんぐりをゲット！");
+    logEvent("acorn_qr", { shopId });
   }
 
   document.getElementById("count").textContent = count;
@@ -884,8 +976,10 @@ function saveShop() {
   const msg  = document.getElementById("shop-form-msg");
 
   if (!name) { msg.textContent = "❌ お店の名前を入力してください"; return; }
+  if (name.length > 30) { msg.textContent = "❌ お店の名前は30文字以内で入力してください"; return; }
   if (!editingShopId) {
     if (!id) { msg.textContent = "❌ お店のIDを入力してください"; return; }
+    if (id.length > 30) { msg.textContent = "❌ IDは30文字以内で入力してください"; return; }
     if (!/^[a-zA-Z0-9\-_]+$/.test(id)) {
       msg.textContent = "❌ IDは英数字・ハイフン・アンダースコアのみ使えます";
       return;
