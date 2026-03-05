@@ -464,7 +464,7 @@ function redrawShopsOnMap() {
   shopMarkers.forEach(m => map.removeLayer(m));
   shopMarkers = [];
 
-  const shopIcon = L.divIcon({ html: "🏪", className: "", iconSize: [32, 32] });
+  const shopIcon = L.divIcon({ html: "🌰", className: "", iconSize: [32, 32] });
 
   // 登録済みで座標があるお店のみマーカーを配置
   shops.filter(s => s.lat != null && s.lng != null).forEach(s => {
