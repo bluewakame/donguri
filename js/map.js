@@ -172,11 +172,17 @@ function spawnLeaf(lat, lng) {
 // 店舗マーカー
 // ===========================
 
-function spawnShops() {
-  redrawShopsOnMap();
+async function spawnShops() {
+  let shopList = shops; // fallback: ローカルのお店
+  try {
+    shopList = await sbLoadShops(); // Supabase から全お店を取得
+  } catch (e) {
+    console.warn("Supabaseからのお店取得に失敗（ローカルデータを使用）:", e);
+  }
+  redrawShopsOnMap(shopList);
 }
 
-function redrawShopsOnMap() {
+function redrawShopsOnMap(shopList) {
   // 既存の店舗マーカーを除去
   shopMarkers.forEach(m => map.removeLayer(m));
   shopMarkers = [];
@@ -184,7 +190,7 @@ function redrawShopsOnMap() {
   const shopIcon = L.divIcon({ html: '<span style="font-size:40px">🌰</span>', className: "", iconSize: [44, 44] });
 
   // 登録済みで座標があるお店のみマーカーを配置
-  shops.filter(s => s.lat != null && s.lng != null).forEach(s => {
+  (shopList || shops).filter(s => s.lat != null && s.lng != null).forEach(s => {
     const m = L.marker([s.lat, s.lng], { icon: shopIcon })
       .addTo(map)
       .bindPopup(`<b>${s.name}</b><br>🌰 QRコードでどんぐりゲット！`);

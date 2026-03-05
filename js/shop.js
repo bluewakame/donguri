@@ -149,7 +149,7 @@ function closeAddShopModal() {
   document.getElementById("addShopOverlay").style.display = "none";
 }
 
-function saveShop() {
+async function saveShop() {
   const name = document.getElementById("shopNameInput").value.trim();
   const id   = document.getElementById("shopIdInput").value.trim();
   const msg  = document.getElementById("shop-form-msg");
@@ -186,13 +186,23 @@ function saveShop() {
   renderShopList();
   closeAddShopModal();
 
+  // Supabase に保存（他のプレイヤーへの公開）
+  const savedShop = editingShopId
+    ? shops.find(s => s.id === editingShopId)
+    : shops[shops.length - 1];
+  try {
+    await sbSaveShop(savedShop);
+  } catch (e) {
+    console.warn("Supabaseへのお店保存に失敗:", e);
+  }
+
   // 地図が初期化済みなら店舗マーカーを再描画
   if (mapInitialized) {
-    redrawShopsOnMap();
+    spawnShops();
   }
 }
 
-function deleteShop(shopId) {
+async function deleteShop(shopId) {
   if (!isShopOwnerLoggedIn()) { openAuthModal(false); return; }
   const shop = shops.find(s => s.id === shopId);
   if (!shop) return;
@@ -200,8 +210,16 @@ function deleteShop(shopId) {
   shops = shops.filter(s => s.id !== shopId);
   saveShopsToStorage();
   renderShopList();
+
+  // Supabase から削除（他のプレイヤーの地図から除去）
+  try {
+    await sbDeleteShop(shopId);
+  } catch (e) {
+    console.warn("Supabaseからのお店削除に失敗:", e);
+  }
+
   if (mapInitialized) {
-    redrawShopsOnMap();
+    spawnShops();
   }
 }
 
