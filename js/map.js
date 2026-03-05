@@ -6,9 +6,15 @@ let map;
 let mapInitialized = false;
 let playerMarker   = null;
 let initialLocSet  = false;
-let lastSpawnLat   = null;
-let lastSpawnLng   = null;
-let lastSpawnTime  = 0;
+let lastSpawnLat  = parseFloat(localStorage.getItem("lastSpawnLat"))    || null;
+let lastSpawnLng  = parseFloat(localStorage.getItem("lastSpawnLng"))    || null;
+let lastSpawnTime = parseInt(localStorage.getItem("lastSpawnTime"), 10) || 0;
+
+function persistSpawnState() {
+  if (lastSpawnLat !== null) localStorage.setItem("lastSpawnLat",  lastSpawnLat);
+  if (lastSpawnLng !== null) localStorage.setItem("lastSpawnLng",  lastSpawnLng);
+  localStorage.setItem("lastSpawnTime", lastSpawnTime);
+}
 
 let shopMarkers = [];
 
@@ -38,12 +44,29 @@ function onLocationFound(e) {
       .addTo(map)
       .bindPopup("あなたの現在地");
 
-    lastSpawnLat  = lat;
-    lastSpawnLng  = lng;
-    lastSpawnTime = Date.now();
+    const now = Date.now();
 
-    // 初期葉っぱを5枚スポーン（バリエーション付き）
-    for (let i = 0; i < 5; i++) spawnLeaf(lat, lng);
+    // リロード時スポーン判定:
+    //   ① 前回スポーン地点から SPAWN_DIST_M 以上移動していれば無条件スポーン
+    //   ② 移動していなくても RELOAD_SPAWN_INTERVAL_MS 以上経過していればスポーン
+    const prevLat      = lastSpawnLat;
+    const prevLng      = lastSpawnLng;
+    const movedEnough  = prevLat !== null &&
+      calcDistanceM(lat, lng, prevLat, prevLng) >= SPAWN_DIST_M;
+    const timeElapsed  = now - lastSpawnTime >= RELOAD_SPAWN_INTERVAL_MS;
+
+    lastSpawnLat = lat;
+    lastSpawnLng = lng;
+
+    if (movedEnough || timeElapsed) {
+      lastSpawnTime = now;
+      persistSpawnState();
+      // 初期葉っぱを5枚スポーン（バリエーション付き）
+      for (let i = 0; i < 5; i++) spawnLeaf(lat, lng);
+    } else {
+      // 時間・距離が足りない場合はスポーンをスキップ（座標のみ更新）
+      persistSpawnState();
+    }
 
     // 登録済み店舗を地図に配置
     spawnShops();
@@ -63,6 +86,7 @@ function onLocationFound(e) {
       lastSpawnLat  = lat;
       lastSpawnLng  = lng;
       lastSpawnTime = now;
+      persistSpawnState();
 
       const n = 2 + Math.floor(Math.random() * 2); // 2〜3枚
       for (let i = 0; i < n; i++) spawnLeaf(lat, lng);

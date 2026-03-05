@@ -14,9 +14,10 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // 移動・スポーン設定
 // ===========================
 
-const SPAWN_DIST_M      = 30;    // 何m移動したら葉っぱ出現
-const SPAWN_RADIUS      = 0.001; // スポーン半径（約110m）
-const SPAWN_INTERVAL_MS = 60000; // 葉っぱスポーンの最小間隔（60秒）
+const SPAWN_DIST_M             = 30;     // 何m移動したら葉っぱ出現
+const SPAWN_RADIUS             = 0.001;  // スポーン半径（約110m）
+const SPAWN_INTERVAL_MS        = 60000;  // 移動スポーンの最小間隔（60秒）
+const RELOAD_SPAWN_INTERVAL_MS = 300000; // リロード時の再スポーン間隔（5分）
 
 // ===========================
 // QRコード設定
