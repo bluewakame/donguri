@@ -183,18 +183,24 @@ async function saveShop() {
   }
 
   saveShopsToStorage();
-  renderShopList();
-  closeAddShopModal();
 
   // Supabase に保存（他のプレイヤーへの公開）
   const savedShop = editingShopId
     ? shops.find(s => s.id === editingShopId)
     : shops[shops.length - 1];
+
+  msg.textContent = "⏳ サーバーに保存中...";
   try {
     await sbSaveShop(savedShop);
   } catch (e) {
     console.warn("Supabaseへのお店保存に失敗:", e);
+    msg.style.color = "#c0392b";
+    msg.textContent = "❌ サーバーへの保存に失敗しました: " + e.message;
+    return;
   }
+
+  renderShopList();
+  closeAddShopModal();
 
   // 地図が初期化済みなら店舗マーカーを再描画
   if (mapInitialized) {
@@ -291,8 +297,9 @@ function closeQrDisplay() {
 // 店舗オーナー認証
 // ===========================
 
-let shopOwnerToken = sessionStorage.getItem("shopOwnerToken") || null;
-let shopOwnerEmail = sessionStorage.getItem("shopOwnerEmail") || null;
+let shopOwnerToken        = sessionStorage.getItem("shopOwnerToken")        || null;
+let shopOwnerEmail        = sessionStorage.getItem("shopOwnerEmail")        || null;
+let shopOwnerRefreshToken = sessionStorage.getItem("shopOwnerRefreshToken") || null;
 
 async function sbSignIn(email, password) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -317,7 +324,8 @@ async function sbSignUp(email, password) {
 }
 
 function isShopOwnerLoggedIn() {
-  return !!shopOwnerToken;
+  if (!shopOwnerToken) return false;
+  return !isTokenExpired(shopOwnerToken);
 }
 
 function openAuthModal(isSignUp) {
@@ -368,8 +376,10 @@ async function submitAuth() {
       if (data.access_token) {
         shopOwnerToken = data.access_token;
         shopOwnerEmail = email;
+        shopOwnerRefreshToken = data.refresh_token || null;
         sessionStorage.setItem("shopOwnerToken", shopOwnerToken);
         sessionStorage.setItem("shopOwnerEmail", shopOwnerEmail);
+        if (shopOwnerRefreshToken) sessionStorage.setItem("shopOwnerRefreshToken", shopOwnerRefreshToken);
         closeAuthModal();
         renderShopOwnerUI();
       } else {
@@ -380,8 +390,10 @@ async function submitAuth() {
       const data = await sbSignIn(email, password);
       shopOwnerToken = data.access_token;
       shopOwnerEmail = email;
+      shopOwnerRefreshToken = data.refresh_token || null;
       sessionStorage.setItem("shopOwnerToken", shopOwnerToken);
       sessionStorage.setItem("shopOwnerEmail", shopOwnerEmail);
+      if (shopOwnerRefreshToken) sessionStorage.setItem("shopOwnerRefreshToken", shopOwnerRefreshToken);
       closeAuthModal();
       renderShopOwnerUI();
     }
@@ -393,10 +405,12 @@ async function submitAuth() {
 
 function signOut() {
   if (!confirm("ログアウトしますか？")) return;
-  shopOwnerToken = null;
-  shopOwnerEmail = null;
+  shopOwnerToken        = null;
+  shopOwnerEmail        = null;
+  shopOwnerRefreshToken = null;
   sessionStorage.removeItem("shopOwnerToken");
   sessionStorage.removeItem("shopOwnerEmail");
+  sessionStorage.removeItem("shopOwnerRefreshToken");
   renderShopOwnerUI();
 }
 
