@@ -1,4 +1,4 @@
-const CACHE_NAME = "donguri-v1";
+const CACHE_NAME = "donguri-v2";
 
 // キャッシュするファイル一覧
 const CACHE_FILES = [

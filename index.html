@@ -46,7 +46,7 @@
       <p>次の木まであと <span id="nextTree"></span> 個</p>
       <p id="forest-message"></p>
 
-      <p id="message"></p>
+      <p id="message" aria-live="polite"></p>
       <p id="caterpillar"></p>
 
       <div id="caterpillarWarning" class="warning-banner" style="display:none;">
@@ -64,8 +64,9 @@
   <div id="page-forest" class="page">
     <div class="container">
       <h1>🗺️ 地図探索</h1>
-      <p id="forest-message"></p>
+      <p id="map-forest-message" aria-live="polite"></p>
       <div id="map"></div>
+      <button id="locationAllowBtn" onclick="acceptLocationConsent()" style="display:none; margin-top:12px;">📍 位置情報を許可する</button>
     </div>
   </div>
 
@@ -82,7 +83,7 @@
         <video id="scanner-video" playsinline muted></video>
       </div>
       <canvas id="scanner-canvas" style="display:none"></canvas>
-      <p id="qr-message"></p>
+      <p id="qr-message" aria-live="polite"></p>
       <button id="scanStartBtn" onclick="startScanner()">📷 スキャン開始</button>
       <button id="scanStopBtn" onclick="stopScanner()" style="display:none; background:#c0392b;">⏹ スキャン停止</button>
     </div>
@@ -119,8 +120,8 @@
   </div>
 
   <!-- ========== 認証モーダル ========== -->
-  <div id="authOverlay" class="overlay" style="display:none;" onclick="closeAuthModal()"></div>
-  <div id="authModal" class="modal" style="display:none;" data-mode="signin">
+  <div id="authOverlay" class="overlay" style="display:none;" onclick="closeAuthModal()" aria-hidden="true"></div>
+  <div id="authModal" class="modal" style="display:none;" data-mode="signin" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <h2 id="authTitle">🏪 ログイン</h2>
     <div class="shop-form">
       <label class="form-label">メールアドレス</label>
@@ -135,8 +136,8 @@
   </div>
 
   <!-- ========== お店追加モーダル ========== -->
-  <div id="addShopOverlay" class="overlay" style="display:none;" onclick="closeAddShopModal()"></div>
-  <div id="addShopModal" class="modal" style="display:none;">
+  <div id="addShopOverlay" class="overlay" style="display:none;" onclick="closeAddShopModal()" aria-hidden="true"></div>
+  <div id="addShopModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="addShopTitle">
     <h2 id="addShopTitle">🏪 お店を追加</h2>
     <div class="shop-form">
       <label class="form-label">お店の名前</label>
@@ -152,8 +153,8 @@
   </div>
 
   <!-- ========== QRコード表示モーダル ========== -->
-  <div id="qrDisplayOverlay" class="overlay" style="display:none;" onclick="closeQrDisplay()"></div>
-  <div id="qrDisplayModal" class="modal" style="display:none;">
+  <div id="qrDisplayOverlay" class="overlay" style="display:none;" onclick="closeQrDisplay()" aria-hidden="true"></div>
+  <div id="qrDisplayModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="qrShopName">
     <h2 id="qrShopName">QRコード</h2>
     <div id="qrCanvas" class="qr-canvas-wrap"></div>
     <p id="qrCountdown" class="qr-countdown"></p>
@@ -163,9 +164,9 @@
   </div>
 
   <!-- ========== 金どんぐりショップ モーダル ========== -->
-  <div id="goldShopOverlay" class="overlay" style="display:none;" onclick="closeGoldShop()"></div>
-  <div id="goldShop" class="modal" style="display:none;">
-    <h2>✨ 金どんぐりショップ</h2>
+  <div id="goldShopOverlay" class="overlay" style="display:none;" onclick="closeGoldShop()" aria-hidden="true"></div>
+  <div id="goldShop" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="goldShopTitle">
+    <h2 id="goldShopTitle">✨ 金どんぐりショップ</h2>
     <p>所持: <span id="goldInShop">0</span> 個</p>
     <div class="shop-item" onclick="buyItem('boost')">
       <span class="shop-icon">⚡</span>
@@ -192,24 +193,39 @@
   </div>
 
   <!-- ========== 下部ナビゲーション ========== -->
-  <nav class="bottom-nav">
-    <button class="nav-btn active" id="nav-acorn" onclick="showPage('acorn')">
-      <span class="nav-icon">🌰</span>
+  <nav class="bottom-nav" role="navigation" aria-label="メインナビゲーション">
+    <button class="nav-btn active" id="nav-acorn" onclick="showPage('acorn')" aria-label="どんぐりページ" aria-current="page">
+      <span class="nav-icon" aria-hidden="true">🌰</span>
       <span class="nav-label">どんぐり</span>
     </button>
-    <button class="nav-btn" id="nav-forest" onclick="showPage('forest')">
-      <span class="nav-icon">🗺️</span>
+    <button class="nav-btn" id="nav-forest" onclick="showPage('forest')" aria-label="地図探索ページ">
+      <span class="nav-icon" aria-hidden="true">🗺️</span>
       <span class="nav-label">地図</span>
     </button>
-    <button class="nav-btn" id="nav-qr" onclick="showPage('qr')">
-      <span class="nav-icon">📷</span>
+    <button class="nav-btn" id="nav-qr" onclick="showPage('qr')" aria-label="QRスキャンページ">
+      <span class="nav-icon" aria-hidden="true">📷</span>
       <span class="nav-label">QR</span>
     </button>
-    <button class="nav-btn" id="nav-shop" onclick="showPage('shop')">
-      <span class="nav-icon">🏪</span>
+    <button class="nav-btn" id="nav-shop" onclick="showPage('shop')" aria-label="お店管理ページ">
+      <span class="nav-icon" aria-hidden="true">🏪</span>
       <span class="nav-label">お店</span>
     </button>
   </nav>
+
+  <!-- ========== 位置情報同意モーダル ========== -->
+  <div id="locationConsentOverlay" class="overlay" style="display:none;" aria-hidden="true"></div>
+  <div id="locationConsentModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="locationConsentTitle">
+    <h2 id="locationConsentTitle">📍 位置情報の利用について</h2>
+    <p class="consent-text">このゲームは地図探索のために現在地を継続的に取得します。</p>
+    <ul class="consent-list">
+      <li>🗺️ 移動に合わせて葉っぱ・どんぐりが出現します</li>
+      <li>🏪 お店の位置を地図に表示します</li>
+      <li>💾 位置情報はサーバーには送信されません</li>
+    </ul>
+    <p class="consent-note">ブラウザの設定からいつでも変更できます。</p>
+    <button onclick="acceptLocationConsent()">📍 許可して地図を開く</button>
+    <button class="cancel-btn" onclick="declineLocationConsent()">許可しない</button>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="script.js"></script>
