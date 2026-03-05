@@ -358,6 +358,12 @@ button:active { background-color: #5e7a52; }
   text-overflow: ellipsis;
 }
 
+.shop-visit-stats {
+  font-size: 11px;
+  color: #2c7a2c;
+  font-weight: 600;
+}
+
 .shop-mgmt-actions {
   display: flex;
   gap: 6px;
