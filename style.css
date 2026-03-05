@@ -487,3 +487,52 @@ button:active { background-color: #5e7a52; }
     border-right: 1px solid #e0e0e0;
   }
 }
+
+/* ===========================
+   認証・お店管理 追加スタイル
+   =========================== */
+
+.shop-owner-info {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.logout-btn {
+  background: none;
+  border: 1px solid #c0392b;
+  color: #c0392b;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  margin: 0;
+  width: auto;
+  display: inline-block;
+}
+
+.logout-btn:hover {
+  background: #c0392b;
+  color: #fff;
+}
+
+.location-btn {
+  background: #7c9a6d;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.location-btn:hover {
+  background: #5a8a4a;
+}
