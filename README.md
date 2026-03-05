@@ -72,38 +72,54 @@ create table users (
 );
 ```
 
-### 3. Row Level Security（RLS）の設定 ⚠️ 必須
+### 3. Anonymous Auth を有効化
+
+Supabase ダッシュボード > **Authentication > Sign In / Providers** を開き、
+**Anonymous Sign-ins** を **Enabled** に切り替えます。
+
+これにより、アプリ起動時に各ユーザーが自動で匿名アカウントを取得し、
+`auth.uid()` によるサーバー側の本人確認が機能します。
+
+### 4. Row Level Security（RLS）の設定 ⚠️ 必須
 
 **RLS を有効化しないとすべてのユーザーデータが誰でも読み書きできる状態になります。**
 
+まず既存のポリシー（`allow_insert` / `allow_update` / `Enable read access for all users`）を削除し、
+以下を実行してください：
+
 ```sql
--- RLS を有効化
+-- RLS を有効化（すでに有効な場合はスキップ）
 alter table users enable row level security;
 
--- 自分のデータのみ読み取り可能
-create policy "users can read own data"
+-- 既存の緩すぎるポリシーを削除
+drop policy if exists "allow_insert"                  on users;
+drop policy if exists "allow_update"                  on users;
+drop policy if exists "Enable read access for all users" on users;
+
+-- 自分のデータのみ読み取り可能（auth.uid() で本人確認）
+create policy "users_select_own"
   on users for select
-  using (user_key = current_user);
+  using (user_key = auth.uid()::text);
 
 -- 自分のデータのみ書き込み可能
-create policy "users can insert own data"
+create policy "users_insert_own"
   on users for insert
-  with check (user_key = current_user);
+  with check (user_key = auth.uid()::text);
 
 -- 自分のデータのみ更新可能
-create policy "users can update own data"
+create policy "users_update_own"
   on users for update
-  using (user_key = current_user);
+  using (user_key = auth.uid()::text);
 
 -- 自分のデータのみ削除可能
-create policy "users can delete own data"
+create policy "users_delete_own"
   on users for delete
-  using (user_key = current_user);
+  using (user_key = auth.uid()::text);
 ```
 
-> 参考: [Supabase RLS ドキュメント](https://supabase.com/docs/guides/auth/row-level-security)
+> 参考: [Supabase Anonymous Sign-ins](https://supabase.com/docs/guides/auth/anonymous-sign-ins) / [RLS ドキュメント](https://supabase.com/docs/guides/auth/row-level-security)
 
-### 4. 接続情報の設定
+### 5. 接続情報の設定
 
 `script.js` の先頭にある以下の値を自分のプロジェクトの値に書き換えます：
 

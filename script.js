@@ -4,58 +4,102 @@
 //
 // ⚠️  セキュリティ注意:
 //   SUPABASE_KEY は Supabase の anonymous (公開) キーです。
-//   フロントエンドから利用することを想定した設計ですが、
-//   Supabase ダッシュボードで Row Level Security (RLS) を
-//   有効化し、適切なポリシーを設定することで不正アクセスを防いでください。
-//   参考: https://supabase.com/docs/guides/auth/row-level-security
+//   ゲームユーザーは匿名認証（Anonymous Auth）を使用するため、
+//   RLS ポリシーで auth.uid() による行レベル制御が有効に機能します。
+//   参考: https://supabase.com/docs/guides/auth/anonymous-sign-ins
 
 const SUPABASE_URL = "https://qqibyplvoeatjuyklqnp.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxaWJ5cGx2b2VhdGp1eWtscW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2Mjc2NTAsImV4cCI6MjA4ODIwMzY1MH0.a-pJtRp3UXHSlyGwPD8STIH86tvrfjxAow9_C6uVtU4";
 
-async function sbGet(userKey) {
+// ===========================
+// 匿名認証（ゲームユーザー）
+// ===========================
+
+let authToken  = localStorage.getItem("authToken")  || null;
+let authUserId = localStorage.getItem("authUserId") || null;
+
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000 < Date.now() + 60000; // 1分前に期限切れとみなす
+  } catch (_) {
+    return true;
+  }
+}
+
+async function refreshAuthToken() {
+  const refreshToken = localStorage.getItem("authRefreshToken");
+  if (!refreshToken) { authToken = null; authUserId = null; return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    authToken = data.access_token;
+    if (data.refresh_token) localStorage.setItem("authRefreshToken", data.refresh_token);
+    localStorage.setItem("authToken", authToken);
+  } catch (_) {
+    authToken  = null;
+    authUserId = null;
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authRefreshToken");
+    localStorage.removeItem("authUserId");
+  }
+}
+
+async function ensureAuth() {
+  if (authToken && authUserId && !isTokenExpired(authToken)) return;
+  if (authToken && authUserId && isTokenExpired(authToken)) {
+    await refreshAuthToken();
+    if (authToken && authUserId) return;
+  }
+  // 新規匿名サインイン
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ data: {} })
+  });
+  if (!res.ok) throw new Error("匿名認証に失敗しました");
+  const data = await res.json();
+  authToken  = data.access_token;
+  authUserId = data.user.id;
+  localStorage.setItem("authToken",        authToken);
+  localStorage.setItem("authRefreshToken", data.refresh_token);
+  localStorage.setItem("authUserId",       authUserId);
+}
+
+async function sbGet(userId) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userKey)}&limit=1`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }
+    `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userId)}&limit=1`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + authToken } }
   );
   const data = await res.json();
   return data[0] || null;
 }
 
-async function sbUpsert(userKey, fields) {
+async function sbUpsert(userId, fields) {
   await fetch(`${SUPABASE_URL}/rest/v1/users`, {
     method: "POST",
     headers: {
       apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY,
+      Authorization: "Bearer " + authToken,
       "Content-Type": "application/json",
       Prefer: "resolution=merge-duplicates"
     },
-    body: JSON.stringify({ user_key: userKey, ...fields })
+    body: JSON.stringify({ user_key: userId, ...fields })
   });
 }
 
-async function sbDelete(userKey) {
+async function sbDelete(userId) {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userKey)}`,
-    { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }
+    `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + authToken } }
   );
   if (!res.ok) throw new Error("削除に失敗しました");
 }
-
-// ===========================
-// ユーザーキー（端末固有ID）
-// ===========================
-
-function getUserKey() {
-  let key = localStorage.getItem("userKey");
-  if (!key) {
-    key = "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
-    localStorage.setItem("userKey", key);
-  }
-  return key;
-}
-
-const USER_KEY = getUserKey();
 
 // ===========================
 // 状態変数
@@ -120,7 +164,8 @@ async function initApp() {
   showMessage("📡 データを読み込み中...");
 
   try {
-    const row = await sbGet(USER_KEY);
+    await ensureAuth();
+    const row = await sbGet(authUserId);
     if (row) {
       count     = row.acorn_count  || 0;
       gold      = row.gold_count   || 0;
@@ -129,7 +174,7 @@ async function initApp() {
       shieldEnd = row.shield_end   || 0;
       applyTimeDecay(row.last_visit || 0);
     } else {
-      await sbUpsert(USER_KEY, {
+      await sbUpsert(authUserId, {
         acorn_count: 0, gold_count: 0, leaf_count: 0,
         boiled_count: 0, shield_end: 0, last_visit: Date.now()
       });
@@ -165,7 +210,7 @@ async function saveData() {
   localStorage.setItem("lastVisit",   now);
 
   try {
-    await sbUpsert(USER_KEY, {
+    await sbUpsert(authUserId, {
       acorn_count:  count,
       gold_count:   gold,
       leaf_count:   leaf,
@@ -1128,14 +1173,15 @@ async function deleteUserData() {
   showMessage("🗑️ データを削除中...");
 
   try {
-    await sbDelete(USER_KEY);
+    await sbDelete(authUserId);
   } catch (e) {
     console.warn("Supabaseからの削除に失敗（ローカルデータは削除します）:", e);
   }
 
   // ローカルデータを全消去
   const keysToRemove = [
-    "userKey", "acornCount", "goldCount", "leafCount", "boiledCount",
+    "authToken", "authRefreshToken", "authUserId",
+    "acornCount", "goldCount", "leafCount", "boiledCount",
     "shieldEnd", "lastVisit", "locationConsent", "eventLog", "managedShops"
   ];
   keysToRemove.forEach(k => localStorage.removeItem(k));
