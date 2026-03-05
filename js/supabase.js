@@ -147,10 +147,51 @@ async function sbLogVisit(shopId, rewardType, latLng) {
 // ===========================
 
 /**
+ * 店舗オーナートークンをリフレッシュする。
+ * リフレッシュトークンがない or 失敗した場合はセッションをクリアして例外を投げる。
+ */
+async function refreshShopOwnerToken() {
+  if (!shopOwnerRefreshToken) {
+    shopOwnerToken = null;
+    sessionStorage.removeItem("shopOwnerToken");
+    throw new Error("セッションが期限切れです。再度ログインしてください。");
+  }
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: shopOwnerRefreshToken }),
+  });
+  if (!res.ok) {
+    shopOwnerToken = null;
+    shopOwnerRefreshToken = null;
+    sessionStorage.removeItem("shopOwnerToken");
+    sessionStorage.removeItem("shopOwnerRefreshToken");
+    throw new Error("セッションが期限切れです。再度ログインしてください。");
+  }
+  const data = await res.json();
+  shopOwnerToken = data.access_token;
+  sessionStorage.setItem("shopOwnerToken", shopOwnerToken);
+  if (data.refresh_token) {
+    shopOwnerRefreshToken = data.refresh_token;
+    sessionStorage.setItem("shopOwnerRefreshToken", shopOwnerRefreshToken);
+  }
+}
+
+/**
+ * 店舗オーナートークンが有効であることを保証する。
+ * 期限切れの場合はリフレッシュを試みる。
+ */
+async function ensureShopOwnerAuth() {
+  if (!shopOwnerToken) throw new Error("ログインが必要です。");
+  if (isTokenExpired(shopOwnerToken)) await refreshShopOwnerToken();
+}
+
+/**
  * お店情報を Supabase に保存（追加・更新）する。
  * shopOwnerToken が必要（RLS: owner_id = auth.uid()）。
  */
 async function sbSaveShop(shop) {
+  await ensureShopOwnerAuth();
   let ownerId = null;
   try { ownerId = JSON.parse(atob(shopOwnerToken.split(".")[1])).sub; } catch (_) {}
   const res = await fetch(`${SUPABASE_URL}/rest/v1/shops`, {
