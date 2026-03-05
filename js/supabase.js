@@ -223,6 +223,19 @@ async function sbDeleteShop(shopId) {
 }
 
 /**
+ * ログイン中のオーナーが所有するお店を Supabase から取得する（RLS で自動フィルタ）。
+ * shopOwnerToken が必要。
+ */
+async function sbLoadOwnShops() {
+  await ensureShopOwnerAuth();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/shops?select=id,name,lat,lng,created_at`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + shopOwnerToken },
+  });
+  if (!res.ok) throw new Error("お店の取得に失敗しました");
+  return await res.json();
+}
+
+/**
  * Supabase から全お店を取得する（全プレイヤー向け）。
  */
 async function sbLoadShops() {

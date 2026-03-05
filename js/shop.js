@@ -414,12 +414,26 @@ function signOut() {
   renderShopOwnerUI();
 }
 
-function renderShopOwnerUI() {
+async function renderShopOwnerUI() {
   const loggedIn = isShopOwnerLoggedIn();
   document.getElementById("shop-auth-required").style.display  = loggedIn ? "none"  : "block";
   document.getElementById("shop-owner-content").style.display  = loggedIn ? "block" : "none";
   if (loggedIn) {
     document.getElementById("shop-owner-email").textContent = shopOwnerEmail || "";
+    // Supabase から自分のお店を取得して localStorage を復元
+    try {
+      const remoteShops = await sbLoadOwnShops();
+      shops = remoteShops.map(s => ({
+        id: s.id,
+        name: s.name,
+        lat: s.lat,
+        lng: s.lng,
+        createdAt: s.created_at ? new Date(s.created_at).getTime() : Date.now(),
+      }));
+      saveShopsToStorage();
+    } catch (e) {
+      console.warn("Supabaseからのお店復元に失敗（ローカルデータを使用）:", e);
+    }
     renderShopList();
   }
 }
