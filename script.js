@@ -93,6 +93,58 @@ async function sbUpsert(userId, fields) {
   });
 }
 
+// ===========================
+// 来店ログ（社会実験データ収集）
+// ===========================
+
+async function sbLogVisit(shopId, rewardType) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/visit_logs`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: "Bearer " + authToken,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ shop_id: shopId, reward_type: rewardType })
+    });
+  } catch (e) {
+    console.warn("来店ログの送信に失敗:", e);
+  }
+}
+
+async function sbGetVisitStats(shopId) {
+  const token = shopOwnerToken || authToken;
+  if (!token) return { today: "–", total: "–" };
+  try {
+    // 今日（JST）の開始時刻を計算
+    const nowJst    = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const todayJst  = nowJst.toISOString().slice(0, 10);
+    const todayStart = `${todayJst}T00:00:00+09:00`;
+
+    const [resDay, resAll] = await Promise.all([
+      fetch(
+        `${SUPABASE_URL}/rest/v1/visit_logs?shop_id=eq.${encodeURIComponent(shopId)}&scanned_at=gte.${encodeURIComponent(todayStart)}&select=id&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + token, Prefer: "count=exact" } }
+      ),
+      fetch(
+        `${SUPABASE_URL}/rest/v1/visit_logs?shop_id=eq.${encodeURIComponent(shopId)}&select=id&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + token, Prefer: "count=exact" } }
+      )
+    ]);
+
+    const parseCount = res => {
+      const cr = res.headers.get("Content-Range") || "";
+      const n  = parseInt(cr.split("/")[1]);
+      return isNaN(n) ? "–" : n;
+    };
+    return { today: parseCount(resDay), total: parseCount(resAll) };
+  } catch (e) {
+    console.warn("来店統計の取得に失敗:", e);
+    return { today: "–", total: "–" };
+  }
+}
+
 async function sbDelete(userId) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/users?user_key=eq.${encodeURIComponent(userId)}`,
@@ -696,8 +748,10 @@ async function handleQrResult(text) {
   count++;
 
   // 5%の確率で金どんぐり
+  let rewardType = "acorn";
   if (Math.random() < 0.05) {
     gold++;
+    rewardType = "gold_acorn";
     document.getElementById("gold").textContent = gold;
     showQrMessage("✨🌰 【" + shopId + "】で金どんぐりをゲット！");
     logEvent("gold_acorn_qr", { shopId });
@@ -705,6 +759,9 @@ async function handleQrResult(text) {
     showQrMessage("🌰 【" + shopId + "】でどんぐりをゲット！");
     logEvent("acorn_qr", { shopId });
   }
+
+  // 来店ログをSupabaseに送信（社会実験データ）
+  sbLogVisit(shopId, rewardType);
 
   document.getElementById("count").textContent = count;
   updateForest();
@@ -878,20 +935,28 @@ function renderShopList() {
   empty.style.display = "none";
 
   shops.forEach(shop => {
+    const safeId = escapeHtml(shop.id);
     const card = document.createElement("div");
     card.className = "shop-mgmt-card";
     card.innerHTML = `
       <div class="shop-mgmt-info">
         <span class="shop-mgmt-name">${escapeHtml(shop.name)}</span>
-        <span class="shop-mgmt-id">ID: ${escapeHtml(shop.id)}</span>
+        <span class="shop-mgmt-id">ID: ${safeId}</span>
+        <span class="shop-visit-stats" id="vstats-${safeId}">📊 集計中...</span>
       </div>
       <div class="shop-mgmt-actions">
-        <button class="shop-action-btn qr-btn" onclick="showShopQR('${escapeHtml(shop.id)}')">QR</button>
-        <button class="shop-action-btn edit-btn" onclick="openEditShopModal('${escapeHtml(shop.id)}')">編集</button>
-        <button class="shop-action-btn del-btn" onclick="deleteShop('${escapeHtml(shop.id)}')">削除</button>
+        <button class="shop-action-btn qr-btn" onclick="showShopQR('${safeId}')">QR</button>
+        <button class="shop-action-btn edit-btn" onclick="openEditShopModal('${safeId}')">編集</button>
+        <button class="shop-action-btn del-btn" onclick="deleteShop('${safeId}')">削除</button>
       </div>
     `;
     list.appendChild(card);
+
+    // 非同期で来客数を取得して表示
+    sbGetVisitStats(shop.id).then(stats => {
+      const el = document.getElementById("vstats-" + shop.id);
+      if (el) el.textContent = `📊 今日: ${stats.today}件 / 累計: ${stats.total}件`;
+    });
   });
 }
 
