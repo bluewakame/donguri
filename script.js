@@ -616,6 +616,129 @@ function stopScanner() {
 }
 
 // ===========================
+// 認証（お店管理用）
+// ===========================
+
+let shopOwnerToken = localStorage.getItem("shopOwnerToken") || null;
+let shopOwnerEmail = localStorage.getItem("shopOwnerEmail") || null;
+
+async function sbSignIn(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || "ログインに失敗しました");
+  return data;
+}
+
+async function sbSignUp(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || "登録に失敗しました");
+  return data;
+}
+
+function isShopOwnerLoggedIn() {
+  return !!shopOwnerToken;
+}
+
+function openAuthModal(isSignUp) {
+  document.getElementById("authEmail").value = "";
+  document.getElementById("authPassword").value = "";
+  document.getElementById("auth-form-msg").textContent = "";
+  document.getElementById("authModal").style.display = "block";
+  document.getElementById("authOverlay").style.display = "block";
+  setAuthMode(isSignUp ? "signup" : "signin");
+}
+
+function closeAuthModal() {
+  document.getElementById("authModal").style.display = "none";
+  document.getElementById("authOverlay").style.display = "none";
+}
+
+function setAuthMode(mode) {
+  const isSignUp = mode === "signup";
+  document.getElementById("authTitle").textContent = isSignUp ? "📝 新規登録" : "🔑 ログイン";
+  document.getElementById("authSubmitBtn").textContent = isSignUp ? "登録する" : "ログイン";
+  document.getElementById("authToggleBtn").textContent = isSignUp
+    ? "すでにアカウントをお持ちの方"
+    : "新規登録はこちら";
+  document.getElementById("authModal").dataset.mode = mode;
+}
+
+function toggleAuthMode() {
+  const current = document.getElementById("authModal").dataset.mode;
+  setAuthMode(current === "signin" ? "signup" : "signin");
+  document.getElementById("auth-form-msg").textContent = "";
+}
+
+async function submitAuth() {
+  const email    = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const msg      = document.getElementById("auth-form-msg");
+  const mode     = document.getElementById("authModal").dataset.mode;
+
+  if (!email || !password) {
+    msg.textContent = "❌ メールアドレスとパスワードを入力してください";
+    return;
+  }
+  msg.textContent = "⏳ 処理中...";
+
+  try {
+    if (mode === "signup") {
+      const data = await sbSignUp(email, password);
+      if (data.access_token) {
+        shopOwnerToken = data.access_token;
+        shopOwnerEmail = email;
+        localStorage.setItem("shopOwnerToken", shopOwnerToken);
+        localStorage.setItem("shopOwnerEmail", shopOwnerEmail);
+        closeAuthModal();
+        renderShopOwnerUI();
+      } else {
+        msg.style.color = "#2c7a2c";
+        msg.textContent = "✅ 確認メールを送りました。メール内のリンクをクリックして登録を完了してください。";
+      }
+    } else {
+      const data = await sbSignIn(email, password);
+      shopOwnerToken = data.access_token;
+      shopOwnerEmail = email;
+      localStorage.setItem("shopOwnerToken", shopOwnerToken);
+      localStorage.setItem("shopOwnerEmail", shopOwnerEmail);
+      closeAuthModal();
+      renderShopOwnerUI();
+    }
+  } catch (e) {
+    msg.style.color = "#c0392b";
+    msg.textContent = "❌ " + e.message;
+  }
+}
+
+function signOut() {
+  if (!confirm("ログアウトしますか？")) return;
+  shopOwnerToken = null;
+  shopOwnerEmail = null;
+  localStorage.removeItem("shopOwnerToken");
+  localStorage.removeItem("shopOwnerEmail");
+  renderShopOwnerUI();
+}
+
+function renderShopOwnerUI() {
+  const loggedIn = isShopOwnerLoggedIn();
+  document.getElementById("shop-auth-required").style.display  = loggedIn ? "none"  : "block";
+  document.getElementById("shop-owner-content").style.display  = loggedIn ? "block" : "none";
+  if (loggedIn) {
+    document.getElementById("shop-owner-email").textContent = shopOwnerEmail || "";
+    renderShopList();
+  }
+}
+
+// ===========================
 // お店管理
 // ===========================
 
@@ -669,39 +792,81 @@ function escapeHtml(text) {
     .replace(/'/g, "&#39;");
 }
 
+let shopModalLat = null;
+let shopModalLng = null;
+
+function getLocationForShop() {
+  const locMsg = document.getElementById("shop-location-msg");
+  const btn    = document.getElementById("getLocationBtn");
+  locMsg.textContent = "📍 現在地を取得中...";
+  btn.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      shopModalLat = pos.coords.latitude;
+      shopModalLng = pos.coords.longitude;
+      locMsg.textContent = `📍 取得しました（${shopModalLat.toFixed(5)}, ${shopModalLng.toFixed(5)}）`;
+      btn.disabled = false;
+    },
+    function (err) {
+      let msg = "📍 現在地を取得できませんでした";
+      if (err.code === 1) msg = "📍 位置情報の許可が必要です（ブラウザの設定を確認）";
+      locMsg.textContent = msg;
+      btn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
 function openAddShopModal() {
+  if (!isShopOwnerLoggedIn()) { openAuthModal(false); return; }
+
   editingShopId = null;
+  shopModalLat  = null;
+  shopModalLng  = null;
   document.getElementById("addShopTitle").textContent = "🏪 お店を追加";
   document.getElementById("shopNameInput").value = "";
   document.getElementById("shopIdInput").value = "";
   document.getElementById("shopIdInput").disabled = false;
   document.getElementById("shop-form-msg").textContent = "";
+  document.getElementById("getLocationBtn").style.display = "block";
+
   const locMsg = document.getElementById("shop-location-msg");
+  // 森ページですでに位置取得済みなら使う
   if (playerMarker) {
     const ll = playerMarker.getLatLng();
-    locMsg.textContent = `📍 現在地に配置されます（${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}）`;
+    shopModalLat = ll.lat;
+    shopModalLng = ll.lng;
+    locMsg.textContent = `📍 現在地: ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
   } else {
-    locMsg.textContent = "⚠️ 現在地を取得してから登録してください";
+    locMsg.textContent = "「📍 現在地を取得」ボタンで位置を設定してください";
   }
+
   document.getElementById("addShopModal").style.display = "block";
   document.getElementById("addShopOverlay").style.display = "block";
   document.getElementById("shopNameInput").focus();
 }
 
 function openEditShopModal(shopId) {
+  if (!isShopOwnerLoggedIn()) { openAuthModal(false); return; }
+
   const shop = shops.find(s => s.id === shopId);
   if (!shop) return;
   editingShopId = shopId;
+  shopModalLat  = shop.lat ?? null;
+  shopModalLng  = shop.lng ?? null;
   document.getElementById("addShopTitle").textContent = "🏪 お店を編集";
   document.getElementById("shopNameInput").value = shop.name;
   document.getElementById("shopIdInput").value = shop.id;
   document.getElementById("shopIdInput").disabled = true;
   document.getElementById("shop-form-msg").textContent = "";
+  document.getElementById("getLocationBtn").style.display = "block";
+
   const locMsg = document.getElementById("shop-location-msg");
   if (shop.lat != null && shop.lng != null) {
     locMsg.textContent = `📍 登録済み位置（${shop.lat.toFixed(5)}, ${shop.lng.toFixed(5)}）`;
   } else {
-    locMsg.textContent = "⚠️ この店舗には位置情報がありません";
+    locMsg.textContent = "「📍 現在地を取得」ボタンで位置を設定できます";
   }
   document.getElementById("addShopModal").style.display = "block";
   document.getElementById("addShopOverlay").style.display = "block";
@@ -729,12 +894,11 @@ function saveShop() {
       msg.textContent = "❌ このIDはすでに使われています";
       return;
     }
-    if (!playerMarker) {
-      msg.textContent = "❌ 現在地を取得してから登録してください";
+    if (shopModalLat === null || shopModalLng === null) {
+      msg.textContent = "❌ 「📍 現在地を取得」ボタンで位置を設定してください";
       return;
     }
-    const latlng = playerMarker.getLatLng();
-    shops.push({ id, name, lat: latlng.lat, lng: latlng.lng, createdAt: Date.now() });
+    shops.push({ id, name, lat: shopModalLat, lng: shopModalLng, createdAt: Date.now() });
   } else {
     const shop = shops.find(s => s.id === editingShopId);
     if (shop) shop.name = name;
@@ -751,6 +915,7 @@ function saveShop() {
 }
 
 function deleteShop(shopId) {
+  if (!isShopOwnerLoggedIn()) { openAuthModal(false); return; }
   const shop = shops.find(s => s.id === shopId);
   if (!shop) return;
   if (!confirm(`「${shop.name}」を削除しますか？`)) return;
@@ -838,6 +1003,6 @@ function closeQrDisplay() {
 
 window.onload = function () {
   loadShops();
-  renderShopList();
+  renderShopOwnerUI();
   initApp();
 };

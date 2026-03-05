@@ -90,16 +90,46 @@
   <div id="page-shop" class="page">
     <div class="container">
       <h1>🏪 お店管理</h1>
-      <p class="shop-mgmt-desc">
-        加盟店を登録してQRコードを発行できます。<br>
-        <small>お客さんがQRを読み取るとどんぐりをもらえます</small>
-      </p>
-      <button class="add-shop-btn" onclick="openAddShopModal()">＋ お店を追加</button>
-      <div id="shop-list"></div>
-      <p id="shop-empty" class="shop-empty-msg" style="display:none;">
-        登録されたお店はありません。<br>「＋ お店を追加」から登録してください。
-      </p>
+
+      <!-- 未ログイン時 -->
+      <div id="shop-auth-required">
+        <p class="shop-mgmt-desc">
+          お店を登録・管理するには<br>ログインが必要です。
+        </p>
+        <button class="add-shop-btn" onclick="openAuthModal(false)">🔑 ログイン</button>
+        <button onclick="openAuthModal(true)" style="margin-top:8px; background:#7c9a6d;">📝 新規登録</button>
+      </div>
+
+      <!-- ログイン済み -->
+      <div id="shop-owner-content" style="display:none;">
+        <p class="shop-mgmt-desc">
+          加盟店を登録してQRコードを発行できます。<br>
+          <small>お客さんがQRを読み取るとどんぐりをもらえます</small>
+        </p>
+        <p class="shop-owner-info">👤 <span id="shop-owner-email"></span> <button class="logout-btn" onclick="signOut()">ログアウト</button></p>
+        <button class="add-shop-btn" onclick="openAddShopModal()">＋ お店を追加</button>
+        <div id="shop-list"></div>
+        <p id="shop-empty" class="shop-empty-msg" style="display:none;">
+          登録されたお店はありません。<br>「＋ お店を追加」から登録してください。
+        </p>
+      </div>
     </div>
+  </div>
+
+  <!-- ========== 認証モーダル ========== -->
+  <div id="authOverlay" class="overlay" style="display:none;" onclick="closeAuthModal()"></div>
+  <div id="authModal" class="modal" style="display:none;" data-mode="signin">
+    <h2 id="authTitle">🏪 ログイン</h2>
+    <div class="shop-form">
+      <label class="form-label">メールアドレス</label>
+      <input type="email" id="authEmail" class="form-input" placeholder="example@email.com" autocomplete="email">
+      <label class="form-label">パスワード</label>
+      <input type="password" id="authPassword" class="form-input" placeholder="6文字以上" autocomplete="current-password">
+      <p id="auth-form-msg" class="shop-form-msg"></p>
+    </div>
+    <button id="authSubmitBtn" onclick="submitAuth()">ログイン</button>
+    <button class="cancel-btn" onclick="toggleAuthMode()"><span id="authToggleBtn">新規登録はこちら</span></button>
+    <button class="cancel-btn" onclick="closeAuthModal()">キャンセル</button>
   </div>
 
   <!-- ========== お店追加モーダル ========== -->
@@ -112,6 +142,7 @@
       <label class="form-label">お店のID <small>（英数字・ハイフン）</small></label>
       <input type="text" id="shopIdInput" class="form-input" placeholder="例: cafe-kunugi" maxlength="30">
       <p id="shop-location-msg" class="shop-form-msg" style="color:#555;"></p>
+      <button type="button" id="getLocationBtn" class="location-btn" onclick="getLocationForShop()">📍 現在地を取得</button>
       <p id="shop-form-msg" class="shop-form-msg"></p>
     </div>
     <button onclick="saveShop()">保存</button>
