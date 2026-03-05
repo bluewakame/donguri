@@ -1,14 +1,21 @@
-const CACHE_NAME = "donguri-v2";
+const CACHE_NAME = "donguri-v3";
 
 // キャッシュするファイル一覧
 const CACHE_FILES = [
   "/donguri/",
   "/donguri/index.html",
-  "/donguri/script.js",
   "/donguri/style.css",
   "/donguri/manifest.json",
   "/donguri/icon-192.png",
-  "/donguri/icon-512.png"
+  "/donguri/icon-512.png",
+  "/donguri/js/config.js",
+  "/donguri/js/supabase.js",
+  "/donguri/js/ui.js",
+  "/donguri/js/game.js",
+  "/donguri/js/map.js",
+  "/donguri/js/qr.js",
+  "/donguri/js/shop.js",
+  "/donguri/js/main.js"
 ];
 
 // インストール時：ファイルをキャッシュ
