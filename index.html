@@ -57,6 +57,11 @@
       <button onclick="exchangeLeaf()">🌿5 → 🌰1 交換</button>
       <button class="gold-btn" onclick="openGoldShop()">✨ 金どんぐりショップ</button>
       <button class="reset-btn" onclick="resetGame()">🔄 リセット</button>
+      <div class="footer-links">
+        <button class="text-btn" onclick="openPrivacyModal()">プライバシーポリシー</button>
+        <span class="footer-sep">|</span>
+        <button class="text-btn danger-text" onclick="deleteUserData()">データを削除</button>
+      </div>
     </div>
   </div>
 
@@ -225,6 +230,44 @@
     <p class="consent-note">ブラウザの設定からいつでも変更できます。</p>
     <button onclick="acceptLocationConsent()">📍 許可して地図を開く</button>
     <button class="cancel-btn" onclick="declineLocationConsent()">許可しない</button>
+  </div>
+
+  <!-- ========== プライバシーポリシー モーダル ========== -->
+  <div id="privacyOverlay" class="overlay" style="display:none;" onclick="closePrivacyModal()" aria-hidden="true"></div>
+  <div id="privacyModal" class="modal" style="display:none; max-height:80vh; overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
+    <h2 id="privacyTitle">プライバシーポリシー</h2>
+    <p style="font-size:13px; color:#555; margin-bottom:12px;">最終更新: 2025年</p>
+
+    <h3 style="font-size:15px; margin:12px 0 6px;">収集する情報</h3>
+    <ul style="font-size:14px; line-height:1.7; padding-left:20px;">
+      <li><strong>ゲームデータ</strong>: どんぐり・金どんぐり・葉っぱ・ゆで済みどんぐりの数、バリア有効期限、最終訪問時刻</li>
+      <li><strong>端末識別子</strong>: ランダム生成されるIDをブラウザのローカルストレージに保存します</li>
+      <li><strong>行動ログ</strong>: ゲーム内の行動（葉っぱ収集、QRスキャンなど）を端末内にのみ記録します（社会実験データとして利用）</li>
+    </ul>
+
+    <h3 style="font-size:15px; margin:12px 0 6px;">収集しない情報</h3>
+    <ul style="font-size:14px; line-height:1.7; padding-left:20px;">
+      <li><strong>位置情報</strong>: 地図表示・葉っぱスポーンのためにデバイス上でのみ使用します。サーバーには<strong>送信されません</strong></li>
+      <li><strong>氏名・個人を特定できる情報</strong>: 収集しません</li>
+    </ul>
+
+    <h3 style="font-size:15px; margin:12px 0 6px;">データの保存先</h3>
+    <ul style="font-size:14px; line-height:1.7; padding-left:20px;">
+      <li>ゲームデータは <strong>Supabase</strong>（米国）のサーバーに保存されます</li>
+      <li>お店管理に使用するメールアドレス・パスワードは Supabase Auth で管理されます</li>
+    </ul>
+
+    <h3 style="font-size:15px; margin:12px 0 6px;">データの削除</h3>
+    <p style="font-size:14px; line-height:1.7;">
+      「データを削除」ボタンからいつでもすべてのゲームデータを削除できます。削除後は元に戻せません。
+    </p>
+
+    <h3 style="font-size:15px; margin:12px 0 6px;">お問い合わせ</h3>
+    <p style="font-size:14px; line-height:1.7;">
+      プライバシーに関するご質問は、アプリの提供者までお問い合わせください。
+    </p>
+
+    <button onclick="closePrivacyModal()" style="margin-top:8px;">閉じる</button>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

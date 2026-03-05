@@ -578,3 +578,48 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ===========================
+   フッターリンク
+   =========================== */
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.footer-sep {
+  color: #ccc;
+  font-size: 12px;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-height: unset;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.text-btn:hover {
+  color: #555;
+}
+
+.text-btn.danger-text {
+  color: #c0392b;
+}
+
+.text-btn.danger-text:hover {
+  color: #922b21;
+}

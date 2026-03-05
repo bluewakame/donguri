@@ -1,0 +1,30 @@
+# 環境変数・シークレット
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ログファイル
+*.log
+npm-debug.log*
+
+# 依存パッケージ
+node_modules/
+
+# ビルド成果物
+dist/
+build/
+
+# エディタ設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS生成ファイル
+Thumbs.db
+ehthumbs.db
