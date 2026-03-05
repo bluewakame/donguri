@@ -6,4 +6,5 @@ window.onload = function () {
   loadShops();
   renderShopOwnerUI();
   initApp();
+  initTutorial();
 };
