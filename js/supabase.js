@@ -215,6 +215,7 @@ async function sbSaveShop(shop) {
  * shopOwnerToken が必要（RLS: owner_id = auth.uid()）。
  */
 async function sbDeleteShop(shopId) {
+  await ensureShopOwnerAuth();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/shops?id=eq.${encodeURIComponent(shopId)}`,
     { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + shopOwnerToken } }

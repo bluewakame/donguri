@@ -182,9 +182,7 @@ async function saveShop() {
     }
   }
 
-  saveShopsToStorage();
-
-  // Supabase に保存（他のプレイヤーへの公開）
+  // Supabase に先に保存（失敗したらローカルにも保存しない）
   const savedShop = editingShopId
     ? shops.find(s => s.id === editingShopId)
     : shops[shops.length - 1];
@@ -196,9 +194,12 @@ async function saveShop() {
     console.warn("Supabaseへのお店保存に失敗:", e);
     msg.style.color = "#c0392b";
     msg.textContent = "❌ サーバーへの保存に失敗しました: " + e.message;
+    // Supabase 保存失敗時はローカルにも保存しない（不整合を防ぐ）
+    if (!editingShopId) shops.pop();
     return;
   }
 
+  saveShopsToStorage();
   renderShopList();
   closeAddShopModal();
 
