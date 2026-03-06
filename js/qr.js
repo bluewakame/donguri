@@ -89,6 +89,10 @@ async function handleQrResult(text) {
   }
 
   const shopId   = parts[1];
+  if (!shopId) {
+    showQrMessage("❌ QRコードの形式が正しくありません");
+    return;
+  }
   const qrWindow = parts.length >= 3 ? parseInt(parts[2]) : null;
 
   // ② 時間窓の検証（±1窓 = 最大10分の余裕）

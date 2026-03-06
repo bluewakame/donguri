@@ -67,7 +67,7 @@ const TUTORIAL_STEPS = [
         <div class="tutorial-item">📷 <span>QRコードを表示してお客さんにスキャンしてもらう</span></div>
         <div class="tutorial-item">📊 <span>来店数を確認（今日・昨日・累計）</span></div>
       </div>
-      <p class="tutorial-note">🔄 QRコードは30秒ごとに自動更新され、不正スキャンを防ぎます</p>
+      <p class="tutorial-note">🔄 QRコードは5分ごとに自動更新され、不正スキャンを防ぎます</p>
     `,
   },
   {
