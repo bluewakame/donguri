@@ -54,13 +54,21 @@ create policy "authenticated users can insert own visit_logs"
   on visit_logs for insert
   with check (
     auth.uid() = user_id
-    or user_id is null  -- 後方互換性（既存クライアント用。将来的に削除予定）
   );
 
 -- 読み取り: 誰でも可（個人情報なし・集計用）
 create policy "anyone can read visit_logs"
   on visit_logs for select
   using (true);
+
+-- 更新・削除: 明示的に禁止（来店記録は変更不可）
+create policy "no one can update visit_logs"
+  on visit_logs for update
+  using (false);
+
+create policy "no one can delete visit_logs"
+  on visit_logs for delete
+  using (false);
 
 -- ===========================
 -- shops テーブル（お店登録・全プレイヤーへの公開）
